@@ -1,6 +1,7 @@
 import AppKit
 import SwiftUI
 import WaveformCore
+import WaveformUI
 
 // Usage:
 //   swift run -c release WaveformApp                       draw the microphone

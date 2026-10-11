@@ -10,13 +10,23 @@ public final class LiveInput: @unchecked Sendable {
   /// Ties the audio's time to the host clock; the screen reads it to draw each column at the right moment.
   public let clock = StreamClock()
   public let columnsPerSecond: Double
-  private let engine = AVAudioEngine()
+  private let engine: AVAudioEngine
   private let player = AVAudioPlayerNode()
+  private let requestAccess: @Sendable () async -> Bool
   private var builder: ColumnBuilder?
 
-  public init(ring: ColumnRing, columnsPerSecond: Double = 120) {
+  /// - Parameters:
+  ///   - engine: the audio engine to listen through. Tests pass one in offline rendering mode, so no
+  ///     microphone or speaker is needed.
+  ///   - requestAccess: asks the person for the microphone. The default shows the system prompt.
+  public init(
+    ring: ColumnRing, columnsPerSecond: Double = 120, engine: AVAudioEngine = AVAudioEngine(),
+    requestAccess: @escaping @Sendable () async -> Bool = systemMicrophoneAccess
+  ) {
     self.ring = ring
     self.columnsPerSecond = columnsPerSecond
+    self.engine = engine
+    self.requestAccess = requestAccess
   }
 
   public enum MicrophoneError: Error, CustomStringConvertible {
@@ -29,7 +39,7 @@ public final class LiveInput: @unchecked Sendable {
   /// Draws the microphone. Asks for permission first, and says so plainly if it is refused: a refused
   /// microphone does not fail, it just delivers silence.
   public func startMicrophone() async throws {
-    guard await AVCaptureDevice.requestAccess(for: .audio) else { throw MicrophoneError.denied }
+    guard await requestAccess() else { throw MicrophoneError.denied }
     let input = engine.inputNode
     let format = input.outputFormat(forBus: 0)
     tap(input, format: format)
@@ -66,13 +76,18 @@ public final class LiveInput: @unchecked Sendable {
     node.installTap(onBus: 0, bufferSize: 512, format: format) { buffer, when in
       // Channel 0 only: a voice is mono, and mixing channels would only smooth the peaks.
       guard let data = buffer.floatChannelData?[0] else { return }
-      if when.isHostTimeValid {
-        clock.update(
-          hostSeconds: AVAudioTime.seconds(forHostTime: when.hostTime),
-          streamSeconds: Double(builder.samplesSeen) / rate)
-      }
+      Self.stamp(clock, at: when, samplesSeen: builder.samplesSeen, rate: rate)
       builder.feed(data, count: Int(buffer.frameLength)) { ring.append($0) }
       spectrumBuilder.feed(data, count: Int(buffer.frameLength)) { spectrum.append($0) }
     }
+  }
+
+  /// Tells `clock` that the buffer starting at sample `samplesSeen` began at `when` on the host clock.
+  /// A buffer with no host time (offline rendering) says nothing.
+  static func stamp(_ clock: StreamClock, at when: AVAudioTime, samplesSeen: Int, rate: Double) {
+    guard when.isHostTimeValid else { return }
+    clock.update(
+      hostSeconds: AVAudioTime.seconds(forHostTime: when.hostTime),
+      streamSeconds: Double(samplesSeen) / rate)
   }
 }

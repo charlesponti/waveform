@@ -1,0 +1,13 @@
+name: CI
+on:
+  push: { branches: [main] }
+  pull_request:
+jobs:
+  test:
+    runs-on: macos-15
+    steps:
+      - uses: actions/checkout@v4
+      - name: Tests and the 100% line coverage gate
+        run: ./scripts/coverage.sh
+      - name: Build for iOS
+        run: xcodebuild -scheme WaveformUI -destination 'generic/platform=iOS' build

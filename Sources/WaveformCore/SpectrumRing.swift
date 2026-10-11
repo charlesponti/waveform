@@ -5,6 +5,8 @@ import Synchronization
 public final class SpectrumRing: @unchecked Sendable {
   public let bands: Int
   public let capacity: Int
+  /// Runs between copying and checking whether the writer lapped the copy; for tests only.
+  var afterCopy: (() -> Void)?
   private let slots: UnsafeMutablePointer<Float>
   private let mask: Int
   private let written = Atomic<Int>(0)
@@ -36,15 +38,19 @@ public final class SpectrumRing: @unchecked Sendable {
   @discardableResult
   public func snapshot(_ n: Int, into out: UnsafeMutablePointer<Float>) -> (real: Int, end: Int) {
     let n = min(n, capacity - 1)
-    while true {
-      let end = written.load(ordering: .acquiring)
-      let real = min(n, end)
+    var end = 0
+    var real = 0
+    // If the writer moved on far enough to overwrite what was copied, copy again.
+    repeat {
+      end = written.load(ordering: .acquiring)
+      real = min(n, end)
       if real < n { out.update(repeating: 0, count: (n - real) * bands) }
       for i in 0..<real {
         (out + (n - real + i) * bands).update(from: slots + ((end - real + i) & mask) * bands, count: bands)
       }
-      if written.load(ordering: .acquiring) - (end - real) <= capacity { return (real, end) }
-    }
+      afterCopy?()
+    } while written.load(ordering: .acquiring) - (end - real) > capacity
+    return (real, end)
   }
 }
 

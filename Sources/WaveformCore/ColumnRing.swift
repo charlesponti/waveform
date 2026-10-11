@@ -11,6 +11,9 @@ public final class ColumnRing: @unchecked Sendable {
   private let mask: Int
   private let written = Atomic<Int>(0)
   public let capacity: Int
+  /// Runs between copying and checking whether the writer lapped the copy. Tests use it to be the
+  /// writer at exactly that moment; nothing else sets it.
+  var afterCopy: (() -> Void)?
 
   /// `capacity` is rounded up to a power of two.
   public init(capacity: Int) {
@@ -43,14 +46,17 @@ public final class ColumnRing: @unchecked Sendable {
   @discardableResult
   public func snapshot(_ n: Int, into out: UnsafeMutablePointer<Column>) -> (real: Int, end: Int) {
     let n = min(n, capacity - 1)
-    while true {
-      let end = written.load(ordering: .acquiring)
-      let real = min(n, end)
+    var end = 0
+    var real = 0
+    // If the writer moved on far enough to overwrite what was copied, copy again.
+    repeat {
+      end = written.load(ordering: .acquiring)
+      real = min(n, end)
       for i in 0..<(n - real) { out[i] = .silent }
       for i in 0..<real { out[n - real + i] = slots[(end - real + i) & mask] }
-      // If the writer moved on far enough to overwrite what was copied, copy again.
-      if written.load(ordering: .acquiring) - (end - real) <= capacity { return (real, end) }
-    }
+      afterCopy?()
+    } while written.load(ordering: .acquiring) - (end - real) > capacity
+    return (real, end)
   }
 
   /// The same, returning only how many are real.

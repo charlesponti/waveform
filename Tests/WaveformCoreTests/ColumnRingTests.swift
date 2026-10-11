@@ -47,3 +47,37 @@ import Testing
     #expect(bad == 0, "\(bad) torn reads in \(reads)")
   }
 }
+
+@Suite struct RingRetryTests {
+  @Test func aColumnCopyLappedByTheWriterIsThrownAwayAndRedone() {
+    let ring = ColumnRing(capacity: 8)
+    for i in 0..<8 { ring.append(Column(low: Float(i), high: 0, rms: 0)) }
+    var laps = 0
+    ring.afterCopy = {
+      guard laps == 0 else { return }
+      laps += 1
+      for i in 8..<24 { ring.append(Column(low: Float(i), high: 0, rms: 0)) }  // the writer laps the reader
+    }
+    var out = [Column](repeating: .silent, count: 4)
+    let (real, end) = out.withUnsafeMutableBufferPointer { ring.snapshot(4, into: $0.baseAddress!) }
+    #expect(laps == 1)
+    #expect(real == 4 && end == 24)
+    #expect(out.map(\.low) == [20, 21, 22, 23])  // the second, whole copy
+  }
+
+  @Test func aSpectrumCopyLappedByTheWriterIsThrownAwayAndRedone() {
+    let ring = SpectrumRing(bands: 2, capacity: 8)
+    func frame(_ i: Int) -> [Float] { [Float(i), Float(-i)] }
+    for i in 0..<8 { frame(i).withUnsafeBufferPointer { ring.append($0) } }
+    var laps = 0
+    ring.afterCopy = {
+      guard laps == 0 else { return }
+      laps += 1
+      for i in 8..<24 { frame(i).withUnsafeBufferPointer { ring.append($0) } }
+    }
+    var out = [Float](repeating: 0, count: 8)
+    let (real, end) = out.withUnsafeMutableBufferPointer { ring.snapshot(4, into: $0.baseAddress!) }
+    #expect(laps == 1 && real == 4 && end == 24)
+    #expect(out == [20, -20, 21, -21, 22, -22, 23, -23])
+  }
+}

@@ -89,3 +89,22 @@ private func columns(
     #expect(Scale.linear.height(-0.25) == -0.25)
   }
 }
+
+@Suite struct BuilderCounterTests {
+  @Test func theColumnBuilderCountsSamplesAndColumns() {
+    let builder = ColumnBuilder(sampleRate: 1_000, columnsPerSecond: 10)
+    let x = [Float](repeating: 0.5, count: 350)
+    x.withUnsafeBufferPointer { builder.feed($0.baseAddress!, count: $0.count) { _ in } }
+    #expect(builder.samplesSeen == 350)
+    #expect(builder.columns == 3)
+  }
+
+  @Test func theSpectrumBuilderCountsSamplesAndFrames() {
+    let builder = SpectrumBuilder(sampleRate: 16_000, columnsPerSecond: 100, fftSize: 256, lowHz: 100, highHz: 4_000)
+    let x = [Float](repeating: 0.1, count: 800)
+    var emitted = 0
+    x.withUnsafeBufferPointer { builder.feed($0.baseAddress!, count: $0.count) { _ in emitted += 1 } }
+    #expect(builder.samplesSeen == 800)
+    #expect(builder.frames == 5 && emitted == 5)
+  }
+}

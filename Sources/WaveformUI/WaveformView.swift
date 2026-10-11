@@ -2,53 +2,44 @@ import QuartzCore
 import SwiftUI
 import WaveformCore
 
-/// Reused between frames so drawing never allocates.
-final class Scratch {
-  let columns = UnsafeMutablePointer<Column>.allocate(capacity: 4096)
-  let spectrum = UnsafeMutablePointer<Float>.allocate(capacity: 4096 * 24)
-  var lastCount = 0
-  var lastChange = CACurrentMediaTime()
-  var drawMs = 0.0  // a running average of what drawing a frame costs the CPU
-  var frame = FrameClock(initialPeriod: 1.0 / 60)  // follows the beat of the screen's frames
-  deinit {
-    columns.deallocate()
-    spectrum.deallocate()
-  }
-}
-
-/// The newest columns scrolling in from the right. One path per layer, so a frame is two fills
-/// however many bars there are.
-struct WaveformView: View {
+/// The newest columns scrolling in from the right: a faint bar from lowest to highest sample, and a
+/// bright one for loudness. One path per layer, so a frame is two fills however many bars there are.
+public struct WaveformView: View {
   let ring: ColumnRing
-  var columnsPerSecond: Double = 120
-  var scale: Scale = .decibels(floor: -60)
-  var barWidth: CGFloat = 3
-  var gap: CGFloat = 2
-  var showStats = true
+  var columnsPerSecond: Double
+  var scale: Scale
+  var barWidth: CGFloat
+  var gap: CGFloat
+  var showStats: Bool
   @State private var scratch = Scratch()
 
-  var body: some View {
-    TimelineView(.animation) { _ in
-      Canvas { context, size in
-        let began = CACurrentMediaTime()
-        draw(&context, size)
-        let ms = (CACurrentMediaTime() - began) * 1000
-        scratch.drawMs = scratch.drawMs * 0.95 + ms * 0.05
-      }
-      .overlay(alignment: .topLeading) {
-        if showStats {
-          Text(String(format: "draw %.2f ms", scratch.drawMs))
-            .font(.system(size: 11, design: .monospaced)).foregroundStyle(.secondary).padding(8)
-        }
-      }
-    }
+  /// - Parameters:
+  ///   - ring: the columns to draw, filled by `LiveInput` or by hand.
+  ///   - columnsPerSecond: how fast columns arrive, so the row can slide between arrivals.
+  ///   - scale: linear, or decibels so quiet speech stays visible.
+  ///   - showStats: show what a frame costs in the corner.
+  public init(
+    ring: ColumnRing, columnsPerSecond: Double = 120, scale: Scale = .decibels(floor: -60),
+    barWidth: CGFloat = 3, gap: CGFloat = 2, showStats: Bool = true
+  ) {
+    self.ring = ring
+    self.columnsPerSecond = columnsPerSecond
+    self.scale = scale
+    self.barWidth = barWidth
+    self.gap = gap
+    self.showStats = showStats
+  }
+
+  public var body: some View {
+    FrameCanvas(
+      scratch: scratch, showStats: showStats,
+      stats: { String(format: "draw %.2f ms", scratch.drawMs) }, draw: draw)
   }
 
   private func draw(_ context: inout GraphicsContext, _ size: CGSize) {
     let step = barWidth + gap
     let visible = min(4000, Int(size.width / step) + 2)
-    let real = ring.copyLast(visible, into: scratch.columns)
-    _ = real
+    ring.copyLast(visible, into: scratch.columns)
 
     // Columns arrive 60 times a second but the screen can draw 120, so the row slides left between
     // arrivals instead of jumping a whole column at once.
