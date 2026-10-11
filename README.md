@@ -1,9 +1,19 @@
 # waveform-ios
 
-An accurate voice waveform, and an orb of dots that listens, for iOS and macOS. Time runs from the equator of the
-sphere to the poles, pitch runs round it, and loudness pushes each dot out. The React half is
-[waveform-react](https://github.com/charlesponti/waveform-react), and
-[the explainer](https://charlesponti.github.io/voice-orb/) walks through the maths with live demos.
+[![CI](https://github.com/charlesponti/waveform-ios/actions/workflows/ci.yml/badge.svg)](https://github.com/charlesponti/waveform-ios/actions/workflows/ci.yml)
+![Platforms](https://img.shields.io/badge/platforms-iOS%2018%20%7C%20macOS%2015-blue)
+![Swift](https://img.shields.io/badge/swift-6.2-orange)
+![Line coverage](https://img.shields.io/badge/line%20coverage-100%25-brightgreen)
+[![License: MIT](https://img.shields.io/badge/license-MIT-lightgrey)](LICENSE)
+
+An accurate voice waveform, and an orb of dots that listens, for iOS and macOS.
+
+![The orb at four moments of a synthetic voice](docs/orb.png)
+
+Time runs from the equator of the sphere to the poles, pitch runs round it, and loudness pushes each dot out.
+A hum lights one side, a whistle the other, a hiss the whole high side, and a drum makes rings that spread from the
+equator. [Live demo and explainer](https://charlesponti.github.io/voice-orb/) · React version:
+[waveform-react](https://github.com/charlesponti/waveform-react).
 
 ## Install
 
@@ -11,14 +21,19 @@ Swift Package Manager:
 
 ```swift
 .package(url: "https://github.com/charlesponti/waveform-ios", from: "0.1.0")
-// and in your target:
-.product(name: "WaveformUI", package: "waveform-ios")   // or "WaveformCore"
 ```
 
-Two libraries: `WaveformCore` (no UI: the maths, the rings, the clocks, the microphone) and `WaveformUI`
-(SwiftUI views). Needs iOS 18 or macOS 15, Swift 6.2.
+then, in your target:
 
-## Use
+```swift
+.product(name: "WaveformUI", package: "waveform-ios")     // SwiftUI views (includes Core)
+.product(name: "WaveformCore", package: "waveform-ios")   // no UI: the maths, rings, clocks, microphone
+```
+
+Needs iOS 18 or macOS 15 and Swift 6.2. Add `NSMicrophoneUsageDescription` to your Info.plist if you use the
+microphone.
+
+## Quick start
 
 ```swift
 import SwiftUI
@@ -35,27 +50,44 @@ struct Listening: View {
 }
 ```
 
-Add `NSMicrophoneUsageDescription` to your Info.plist. A refused microphone throws
-`LiveInput.MicrophoneError.denied` instead of quietly delivering silence.
+A refused microphone throws `LiveInput.MicrophoneError.denied` instead of quietly delivering silence. To try it
+without a microphone, play a file with `input.play(file:)`, or fill a ring yourself with `ColumnBuilder` or
+`SpectrumBuilder`.
 
-| View | What it draws |
+## Views (`WaveformUI`)
+
+| View | What it draws | Main parameters |
+| --- | --- | --- |
+| `SpectrumOrbView` | Pitch round the sphere, time down it, loudness pushing dots out | `spectrum`, `clock`, `gain`, `historySeconds`, `dotCount`, `turning` |
+| `OrbView` | The orb with time only | `ring`, `clock`, `gain`, `historySeconds`, `dotCount`, `turning` |
+| `WaveformView` | Columns scrolling in from the right: lowest to highest sample, and loudness | `ring`, `scale`, `barWidth`, `gap` |
+
+All three take `showStats` (a corner readout of what a frame costs) and draw with four fills a frame however many
+dots there are.
+
+## Building blocks (`WaveformCore`)
+
+| Type | Job |
 | --- | --- |
-| `WaveformView` | The newest columns scrolling in from the right: lowest to highest sample, and loudness. |
-| `OrbView` | The orb with time only: loudness pushes dots out. |
-| `SpectrumOrbView` | The orb with pitch round the sphere and time down it. |
-
-To drive a view without a microphone, fill a ring yourself with `ColumnBuilder` or `SpectrumBuilder`, or play a
-file with `LiveInput.play(file:)`.
+| `ColumnBuilder` | Cuts audio into exact columns: lowest, highest, windowed rms, and a level with attack and release |
+| `SpectrumBuilder` | A Hann-windowed FFT folded into log-spaced bands; a sine of amplitude A reads A/√2 |
+| `ColumnRing`, `SpectrumRing` | Lock-free hand-off from the audio thread to the screen |
+| `StreamClock`, `Playhead`, `FrameClock` | Draw each column at the moment it is heard, smoothed by a phase-locked loop |
+| `ColumnWindow`, `SpectrumWindow` | Read the ring at a fractional position with a Catmull-Rom curve |
+| `OrbModel` | The Fibonacci sphere: each dot's age (latitude) and pitch (longitude) |
+| `LiveInput` | The microphone, or a file, into both rings |
+| `Synthesize` | Repeatable synthetic voices for tests and pictures |
 
 ## Why it is accurate
 
 - Column edges are `round(k · sampleRate / rate)`, so an odd rate cannot drift.
 - Loudness is rms over a 25 ms window with instant attack and a 150 ms release, in decibels.
-- A pure tone of amplitude A reads A/√2 in its spectrum band, and the band powers add up to the signal's mean
-  square. Both are tests.
-- The audio thread writes into lock-free rings and never allocates; the screen reads on its own clock.
-- Pictures run a fixed 60 ms behind the audio on the audio's own clock, smoothed by a phase-locked loop on the
-  frame times and a Catmull-Rom curve between columns.
+- Band powers add up to the signal's mean square. Both that and A/√2 are tests.
+- The audio thread writes into lock-free rings and never allocates.
+- Pictures run a fixed 60 ms behind the audio on the audio's own clock.
+
+The [explainer](https://charlesponti.github.io/voice-orb/) shows each step with a live demo, starting from the
+one-number orb that does not work.
 
 ## Tests
 
@@ -64,15 +96,19 @@ swift test
 ./scripts/coverage.sh   # fails below 100% line coverage of WaveformCore and WaveformUI
 ```
 
-Everything in the two library targets is covered, except one line that raises the system microphone dialog
-(`SystemMicrophone.swift`). The audio tap is tested against a real `AVAudioEngine` in offline rendering mode.
+All 784 lines of the two library targets are covered, except the single line that raises the system microphone
+dialog (`SystemMicrophone.swift`). The audio tap is tested against a real `AVAudioEngine` in offline rendering mode.
 
 ## Demo app
 
 ```bash
-swift run -c release WaveformApp          # live microphone, three looks
+swift run -c release WaveformApp                           # live microphone, three looks
 swift run -c release WaveformApp --spectrum-snapshot out.png
 ```
+
+## Releases
+
+See [CHANGELOG.md](CHANGELOG.md) and the [releases page](https://github.com/charlesponti/waveform-ios/releases).
 
 ## License
 
