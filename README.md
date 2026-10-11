@@ -11,6 +11,8 @@ Swift Package Manager:
 
 ```swift
 .package(url: "https://github.com/charlesponti/waveform-ios", from: "0.1.0")
+// and in your target:
+.product(name: "WaveformUI", package: "waveform-ios")   // or "WaveformCore"
 ```
 
 Two libraries: `WaveformCore` (no UI: the maths, the rings, the clocks, the microphone) and `WaveformUI`
