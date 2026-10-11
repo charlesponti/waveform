@@ -6,6 +6,7 @@ import WaveformCore
 //   swift run -c release WaveformApp                       draw the microphone
 //   swift run -c release WaveformApp --file voice.m4a      play a file and draw it
 //   swift run -c release WaveformApp --snapshot out.png    write a picture of a made-up voice
+//   swift run -c release WaveformApp --spectrum-snapshot out.png   the spectrum orb at four moments
 //   swift run -c release WaveformApp --bench               how fast the column maker is
 
 let arguments = CommandLine.arguments
@@ -23,6 +24,39 @@ func prefilled(seconds: Double) -> ColumnRing {
     builder.feed(buffer.baseAddress!, count: buffer.count) { ring.append($0) }
   }
   return ring
+}
+
+func prefilledSpectrum(seconds: Double) -> SpectrumRing {
+  let ring = SpectrumRing(bands: 24, capacity: 8192)
+  let builder = SpectrumBuilder(sampleRate: 48_000)
+  let signal = Synthesize.vowels(seconds: seconds)
+  signal.withUnsafeBufferPointer { buffer in
+    builder.feed(buffer.baseAddress!, count: buffer.count) { ring.append($0) }
+  }
+  return ring
+}
+
+if let path = value(after: "--spectrum-snapshot") {
+  MainActor.assumeIsolated {
+    let moments = [1.4, 2.2, 3.4, 4.6]
+    var images: [NSImage] = []
+    for seconds in moments {
+      let view = SpectrumOrbView(spectrum: prefilledSpectrum(seconds: seconds), showStats: false, turning: false)
+        .frame(width: 360, height: 360)
+        .background(Color(red: 0.03, green: 0.06, blue: 0.06))
+      let renderer = ImageRenderer(content: view)
+      renderer.scale = 2
+      images.append(renderer.nsImage!)
+    }
+    let sheet = NSImage(size: NSSize(width: 360 * images.count, height: 360))
+    sheet.lockFocus()
+    for (i, image) in images.enumerated() { image.draw(in: NSRect(x: 360 * i, y: 0, width: 360, height: 360)) }
+    sheet.unlockFocus()
+    let png = NSBitmapImageRep(data: sheet.tiffRepresentation!)!.representation(using: .png, properties: [:])!
+    try! png.write(to: URL(fileURLWithPath: path))
+    print("wrote \(path)")
+  }
+  exit(0)
 }
 
 if arguments.contains("--bench") {
@@ -91,18 +125,25 @@ struct WaveformApp: App {
   @State private var live = LiveInput(ring: ColumnRing(capacity: 8192))
   @State private var scale: Scale = .decibels(floor: -60)
   @State private var logarithmic = true
-  @State private var orb = true
+  enum Look: String, CaseIterable { case bars = "Bars", orb = "Orb", spectrum = "Spectrum orb" }
+  @State private var look = Look.spectrum
   @State private var status = ""
 
   var body: some Scene {
     WindowGroup("Waveform") {
       VStack(spacing: 0) {
         Group {
-          if orb { OrbView(ring: live.ring, clock: live.clock, scale: scale) } else { WaveformView(ring: live.ring, scale: scale) }
+          switch look {
+          case .bars: WaveformView(ring: live.ring, scale: scale)
+          case .orb: OrbView(ring: live.ring, clock: live.clock, scale: scale)
+          case .spectrum: SpectrumOrbView(spectrum: live.spectrum, clock: live.clock)
+          }
         }
         .background(Color(red: 0.03, green: 0.06, blue: 0.06))
         HStack {
-          Toggle("Orb", isOn: $orb)
+          Picker("Look", selection: $look) {
+            ForEach(Look.allCases, id: \.self) { Text($0.rawValue).tag($0) }
+          }.pickerStyle(.segmented).labelsHidden()
           Toggle("Decibels", isOn: $logarithmic)
             .onChange(of: logarithmic) { scale = logarithmic ? .decibels(floor: -60) : .linear }
         }.padding(8)

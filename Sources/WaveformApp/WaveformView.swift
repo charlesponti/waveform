@@ -5,11 +5,15 @@ import WaveformCore
 /// Reused between frames so drawing never allocates.
 final class Scratch {
   let columns = UnsafeMutablePointer<Column>.allocate(capacity: 4096)
+  let spectrum = UnsafeMutablePointer<Float>.allocate(capacity: 4096 * 24)
   var lastCount = 0
   var lastChange = CACurrentMediaTime()
   var drawMs = 0.0  // a running average of what drawing a frame costs the CPU
   var frame = FrameClock(initialPeriod: 1.0 / 60)  // follows the beat of the screen's frames
-  deinit { columns.deallocate() }
+  deinit {
+    columns.deallocate()
+    spectrum.deallocate()
+  }
 }
 
 /// The newest columns scrolling in from the right. One path per layer, so a frame is two fills

@@ -15,12 +15,16 @@ public struct OrbModel: Sendable {
   public let unit: [SIMD3<Float>]
   /// 0 at the equator (the newest sound) to 1 at a pole (the oldest).
   public let age: [Float]
+  /// Where around the sphere a dot is, as pitch: 0 on one meridian, 1 on the opposite one, the same
+  /// either way round, so there is no seam. Used by the spectrum orb, which turns longitude into pitch.
+  public let pitch: [Float]
 
   public init(count: Int = 1_200) {
     precondition(count > 1)
     self.count = count
     var unit: [SIMD3<Float>] = []
     var age: [Float] = []
+    var pitch: [Float] = []
     unit.reserveCapacity(count)
     age.reserveCapacity(count)
     let golden = Float.pi * (3 - Float(5).squareRoot())
@@ -31,9 +35,11 @@ public struct OrbModel: Sendable {
       let angle = golden * Float(i)
       unit.append(SIMD3(cos(angle) * ring, y, sin(angle) * ring))
       age.append(abs(asin(y)) / (.pi / 2))
+      pitch.append(abs(atan2(sin(angle), cos(angle))) / .pi)
     }
     self.unit = unit
     self.age = age
+    self.pitch = pitch
   }
 
   /// How far out a dot at `age` sits, and how big its peak was.

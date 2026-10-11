@@ -5,6 +5,8 @@ import AVFoundation
 /// lock); the screen only reads the ring.
 public final class LiveInput: @unchecked Sendable {
   public let ring: ColumnRing
+  /// The spectrum, one frame per column.
+  public let spectrum = SpectrumRing(bands: 24, capacity: 8192)
   /// Ties the audio's time to the host clock; the screen reads it to draw each column at the right moment.
   public let clock = StreamClock()
   public let columnsPerSecond: Double
@@ -57,6 +59,8 @@ public final class LiveInput: @unchecked Sendable {
       sampleRate: format.sampleRate, columnsPerSecond: columnsPerSecond, windowBlocks: blocks)
     self.builder = builder
     let ring = ring
+    let spectrum = spectrum
+    let spectrumBuilder = SpectrumBuilder(sampleRate: format.sampleRate, columnsPerSecond: columnsPerSecond)
     let clock = clock
     let rate = format.sampleRate
     node.installTap(onBus: 0, bufferSize: 512, format: format) { buffer, when in
@@ -68,6 +72,7 @@ public final class LiveInput: @unchecked Sendable {
           streamSeconds: Double(builder.samplesSeen) / rate)
       }
       builder.feed(data, count: Int(buffer.frameLength)) { ring.append($0) }
+      spectrumBuilder.feed(data, count: Int(buffer.frameLength)) { spectrum.append($0) }
     }
   }
 }
