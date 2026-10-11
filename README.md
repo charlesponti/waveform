@@ -1,8 +1,8 @@
 # waveform-ios
 
 [![CI](https://github.com/charlesponti/waveform-ios/actions/workflows/ci.yml/badge.svg)](https://github.com/charlesponti/waveform-ios/actions/workflows/ci.yml)
-![Platforms](https://img.shields.io/badge/platforms-iOS%2018%20%7C%20macOS%2015-blue)
-![Swift](https://img.shields.io/badge/swift-6.2-orange)
+[![Swift versions](https://img.shields.io/endpoint?url=https%3A%2F%2Fswiftpackageindex.com%2Fapi%2Fpackages%2Fcharlesponti%2Fwaveform-ios%2Fbadge%3Ftype%3Dswift-versions)](https://swiftpackageindex.com/charlesponti/waveform-ios)
+[![Platforms](https://img.shields.io/endpoint?url=https%3A%2F%2Fswiftpackageindex.com%2Fapi%2Fpackages%2Fcharlesponti%2Fwaveform-ios%2Fbadge%3Ftype%3Dplatforms)](https://swiftpackageindex.com/charlesponti/waveform-ios)
 ![Line coverage](https://img.shields.io/badge/line%20coverage-100%25-brightgreen)
 [![License: MIT](https://img.shields.io/badge/license-MIT-lightgrey)](LICENSE)
 
