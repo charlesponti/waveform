@@ -36,26 +36,15 @@ public struct OrbModel: Sendable {
     self.age = age
   }
 
-  /// How far out a dot at `age` sits, and how big its peak was, from `columns` (oldest first).
-  /// `slide` (0...1) is how far the next column has come toward arriving, so the ripple moves smoothly
-  /// between columns instead of stepping.
+  /// How far out a dot at `age` sits, and how big its peak was.
   ///
-  /// `radius` is 1 for silence and `1 + gain` at full scale. `peak` is 0...1.
+  /// `window` holds recent columns; `playhead` is the (fractional) column that is "now" on screen and
+  /// `history` is how many columns the orb spans, so a dot at `age` shows the sound `age * history`
+  /// columns before the playhead. `radius` is 1 for silence and `1 + gain` at full scale; `peak` is 0...1.
   public static func sample(
-    age: Float, columns: UnsafeBufferPointer<Column>, slide: Float, scale: Scale, gain: Float
+    age: Float, window: ColumnWindow, playhead: Double, history: Double, scale: Scale, gain: Float
   ) -> (radius: Float, peak: Float) {
-    let n = columns.count
-    guard n > 0 else { return (1, 0) }
-    // Position in the history: 0 is the oldest column, n - 1 the newest.
-    let position = max(0, Float(n - 1) - (age * Float(n - 1) + slide))
-    let lower = Int(position)
-    let upper = min(n - 1, lower + 1)
-    let t = position - Float(lower)
-    let a = columns[lower]
-    let b = columns[upper]
-    let rms = scale.height(a.rms) * (1 - t) + scale.height(b.rms) * t
-    let peakA = max(abs(scale.height(a.high)), abs(scale.height(a.low)))
-    let peakB = max(abs(scale.height(b.high)), abs(scale.height(b.low)))
-    return (1 + gain * rms, peakA * (1 - t) + peakB * t)
+    let value = window.value(at: playhead - Double(age) * history, scale: scale)
+    return (1 + gain * value.level, value.peak)
   }
 }

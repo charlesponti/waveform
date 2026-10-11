@@ -10,7 +10,7 @@ let package = Package(
   targets: [
     .target(name: "WaveformCore"),
     .executableTarget(
-      name: "WaveformApp", dependencies: ["WaveformCore"],
+      name: "WaveformApp", dependencies: ["WaveformCore"], exclude: ["Info.plist"],
       // The microphone needs a usage description; a command-line build has no Info.plist, so one is
       // embedded in the executable.
       linkerSettings: [

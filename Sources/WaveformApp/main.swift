@@ -16,8 +16,8 @@ func value(after flag: String) -> String? {
 }
 
 func prefilled(seconds: Double) -> ColumnRing {
-  let ring = ColumnRing(capacity: 4096)
-  let builder = ColumnBuilder(sampleRate: 48_000, columnsPerSecond: 60)
+  let ring = ColumnRing(capacity: 8192)
+  let builder = ColumnBuilder(sampleRate: 48_000, columnsPerSecond: 120, windowBlocks: 3)
   let signal = Synthesize.speechLike(seconds: seconds)
   signal.withUnsafeBufferPointer { buffer in
     builder.feed(buffer.baseAddress!, count: buffer.count) { ring.append($0) }
@@ -28,8 +28,8 @@ func prefilled(seconds: Double) -> ColumnRing {
 if arguments.contains("--bench") {
   let seconds = 600.0
   let signal = Synthesize.speechLike(seconds: seconds)
-  let builder = ColumnBuilder(sampleRate: 48_000, columnsPerSecond: 60)
-  let ring = ColumnRing(capacity: 4096)
+  let builder = ColumnBuilder(sampleRate: 48_000, columnsPerSecond: 120, windowBlocks: 3)
+  let ring = ColumnRing(capacity: 8192)
   let began = ContinuousClock.now
   signal.withUnsafeBufferPointer { buffer in
     var start = 0
@@ -88,17 +88,17 @@ if let path = value(after: "--orb-snapshot") {
 }
 
 struct WaveformApp: App {
-  @State private var ring = ColumnRing(capacity: 4096)
-  @State private var input: LiveInput?
+  @State private var live = LiveInput(ring: ColumnRing(capacity: 8192))
   @State private var scale: Scale = .decibels(floor: -60)
   @State private var logarithmic = true
   @State private var orb = true
+  @State private var status = ""
 
   var body: some Scene {
     WindowGroup("Waveform") {
       VStack(spacing: 0) {
         Group {
-          if orb { OrbView(ring: ring, scale: scale) } else { WaveformView(ring: ring, scale: scale) }
+          if orb { OrbView(ring: live.ring, clock: live.clock, scale: scale) } else { WaveformView(ring: live.ring, scale: scale) }
         }
         .background(Color(red: 0.03, green: 0.06, blue: 0.06))
         HStack {
@@ -106,19 +106,21 @@ struct WaveformApp: App {
           Toggle("Decibels", isOn: $logarithmic)
             .onChange(of: logarithmic) { scale = logarithmic ? .decibels(floor: -60) : .linear }
         }.padding(8)
+        if !status.isEmpty {
+          Text(status).font(.callout).foregroundStyle(.red).padding([.horizontal, .bottom], 8)
+        }
       }
       .frame(minWidth: 600, minHeight: 240)
       .task {
-        let live = LiveInput(ring: ring)
         do {
           if let file = value(after: "--file") {
             try live.play(file: URL(fileURLWithPath: file))
           } else {
-            try live.startMicrophone()
+            try await live.startMicrophone()
           }
-          input = live
         } catch {
           print("Could not start audio: \(error)")
+          status = "\(error)"
         }
       }
     }

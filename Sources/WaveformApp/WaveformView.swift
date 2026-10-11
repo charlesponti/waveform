@@ -8,6 +8,7 @@ final class Scratch {
   var lastCount = 0
   var lastChange = CACurrentMediaTime()
   var drawMs = 0.0  // a running average of what drawing a frame costs the CPU
+  var frame = FrameClock(initialPeriod: 1.0 / 60)  // follows the beat of the screen's frames
   deinit { columns.deallocate() }
 }
 
@@ -15,7 +16,7 @@ final class Scratch {
 /// however many bars there are.
 struct WaveformView: View {
   let ring: ColumnRing
-  var columnsPerSecond: Double = 60
+  var columnsPerSecond: Double = 120
   var scale: Scale = .decibels(floor: -60)
   var barWidth: CGFloat = 3
   var gap: CGFloat = 2

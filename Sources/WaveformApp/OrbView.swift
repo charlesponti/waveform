@@ -7,10 +7,13 @@ import simd
 /// sphere, projects it and draws it, with four fills a frame (one per depth) however many dots.
 struct OrbView: View {
   let ring: ColumnRing
-  var columnsPerSecond: Double = 60
+  var columnsPerSecond: Double = 120
+  /// Where the audio's time meets the screen's. Nil draws the newest sound (for a still picture).
+  var clock: StreamClock?
+  var latency = 0.06
   var scale: Scale = .decibels(floor: -60)
   var gain: Float = 0.45
-  var history = 48  // columns shown: 0.8 s at 60 a second
+  var historySeconds = 0.8  // how much of the past the orb spans, equator to pole
   var showStats = true
   var turning = true
   @State private var scratch = Scratch()
@@ -26,7 +29,7 @@ struct OrbView: View {
       }
       .overlay(alignment: .topLeading) {
         if showStats {
-          Text(String(format: "draw %.2f ms · %d dots", scratch.drawMs, model.count))
+          Text(String(format: "draw %.2f ms · %d dots · %d columns", scratch.drawMs, model.count, ring.count))
             .font(.system(size: 11, design: .monospaced)).foregroundStyle(.secondary).padding(8)
         }
       }
@@ -34,16 +37,17 @@ struct OrbView: View {
   }
 
   private func draw(_ context: inout GraphicsContext, _ size: CGSize) {
-    ring.copyLast(history, into: scratch.columns)
-    let columns = UnsafeBufferPointer(start: scratch.columns, count: history)
-
-    let now = CACurrentMediaTime()
-    let count = ring.count
-    if count != scratch.lastCount {
-      scratch.lastCount = count
-      scratch.lastChange = now
-    }
-    let slide = Float(min(1, (now - scratch.lastChange) * columnsPerSecond))
+    // The picture runs a fixed moment behind the audio, on the audio's own clock, so each column moves
+    // smoothly from the equator toward the poles instead of stepping when the screen notices it.
+    let history = historySeconds * columnsPerSecond
+    let needed = Int(history) + 16
+    let (_, end) = ring.snapshot(needed, into: scratch.columns)
+    let window = ColumnWindow(
+      columns: UnsafeBufferPointer(start: scratch.columns, count: needed), base: end - needed)
+    let frameTime = scratch.frame.tick(CACurrentMediaTime())
+    let playhead = Playhead(columnsPerSecond: columnsPerSecond, latency: latency)
+      .position(hostSeconds: frameTime, clock: clock ?? StreamClock(), written: end)
+    let now = frameTime
 
     // Turn about the vertical axis, tipped a little toward the viewer so the poles can be seen.
     let spin = turning ? Float(now) * 0.35 : 0.6
@@ -57,7 +61,8 @@ struct OrbView: View {
 
     for i in 0..<model.count {
       let (out, peak) = OrbModel.sample(
-        age: model.age[i], columns: columns, slide: slide, scale: scale, gain: gain)
+        age: model.age[i], window: window, playhead: playhead, history: history, scale: scale,
+        gain: gain)
       let u = model.unit[i]
       // Spin, then tip.
       let x1 = u.x * cy + u.z * sy

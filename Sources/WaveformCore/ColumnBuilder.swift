@@ -19,12 +19,32 @@ public final class ColumnBuilder {
   private var sumOfSquares = 0.0
   private var inColumn = 0
 
-  public init(sampleRate: Double, columnsPerSecond: Double) {
+  /// How many of the latest blocks the loudness (`rms`) is measured over. A voice's pitch repeats every
+  /// 4 to 10 milliseconds; a window of a few pitch periods keeps the loudness from flickering with it.
+  public let windowBlocks: Int
+  /// How long `level` takes to fall by a factor of e (about 63%) when the sound stops.
+  public let releaseSeconds: Double
+  private var recent: [(squares: Double, samples: Int)]
+  private var recentIndex = 0
+  private var level: Float = 0
+  private let decay: Float
+
+  public init(
+    sampleRate: Double, columnsPerSecond: Double, windowBlocks: Int = 1, releaseSeconds: Double = 0.15
+  ) {
     precondition(sampleRate > 0 && columnsPerSecond > 0 && columnsPerSecond <= sampleRate)
+    precondition(windowBlocks >= 1)
     self.sampleRate = sampleRate
     self.columnsPerSecond = columnsPerSecond
+    self.windowBlocks = windowBlocks
+    self.releaseSeconds = releaseSeconds
+    recent = Array(repeating: (0, 0), count: windowBlocks)
+    decay = Float(exp(-1 / (columnsPerSecond * max(releaseSeconds, 1e-6))))
     nextEdge = Self.edge(1, sampleRate, columnsPerSecond)
   }
+
+  /// How many samples have been fed in so far.
+  public var samplesSeen: Int { seen }
 
   private static func edge(_ index: Int, _ sampleRate: Double, _ rate: Double) -> Int {
     Int((Double(index) * sampleRate / rate).rounded())
@@ -51,8 +71,17 @@ public final class ColumnBuilder {
       seen += take
       offset += take
       if seen >= nextEdge {
-        emit(
-          Column(low: low, high: high, rms: Float((sumOfSquares / Double(inColumn)).squareRoot())))
+        recent[recentIndex] = (sumOfSquares, inColumn)
+        recentIndex = (recentIndex + 1) % windowBlocks
+        var windowSquares = 0.0
+        var windowSamples = 0
+        for block in recent {
+          windowSquares += block.squares
+          windowSamples += block.samples
+        }
+        let rms = Float((windowSquares / Double(max(1, windowSamples))).squareRoot())
+        level = max(rms, level * decay)
+        emit(Column(low: low, high: high, rms: rms, level: level))
         emitted += 1
         nextEdge = Self.edge(emitted + 1, sampleRate, columnsPerSecond)
         low = .infinity
