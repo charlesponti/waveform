@@ -28,6 +28,12 @@ import Testing
     }
   }
 
+  /// The engine hands taps their buffers on its own queue, a little after rendering, so wait (up to
+  /// five seconds) for the rings to catch up instead of reading them the instant rendering stops.
+  private func waitUntil(_ condition: () -> Bool) async {
+    for _ in 0..<500 where !condition() { try? await Task.sleep(for: .milliseconds(10)) }
+  }
+
   private func pcm(_ samples: [Float]) -> AVAudioPCMBuffer {
     let format = AVAudioFormat(standardFormatWithSampleRate: Self.rate, channels: 1)!
     let buffer = AVAudioPCMBuffer(pcmFormat: format, frameCapacity: AVAudioFrameCount(samples.count))!
@@ -49,13 +55,14 @@ import Testing
     return url
   }
 
-  @Test func playingAFileFillsTheColumnAndSpectrumRings() throws {
+  @Test func playingAFileFillsTheColumnAndSpectrumRings() async throws {
     let engine = try offlineEngine()
     let live = LiveInput(ring: ColumnRing(capacity: 1024), columnsPerSecond: 120, engine: engine)
     let url = try wav(seconds: 1)
     defer { try? FileManager.default.removeItem(at: url) }
     try live.play(file: url)
     try render(engine, seconds: 1)
+    await waitUntil { live.ring.count >= 100 && live.spectrum.count == live.ring.count }
     live.stop()
     // One second at 120 columns a second. The engine hands the tap its buffers in chunks, so the last
     // few columns may still be on their way; what matters is that most arrived and none were invented.
@@ -68,13 +75,14 @@ import Testing
     #expect(loudest > 0.01)
   }
 
-  @Test func theClockIsToldWhenEachBufferBegan() throws {
+  @Test func theClockIsToldWhenEachBufferBegan() async throws {
     let engine = try offlineEngine()
     let live = LiveInput(ring: ColumnRing(capacity: 1024), engine: engine)
     let url = try wav(seconds: 1)
     defer { try? FileManager.default.removeItem(at: url) }
     try live.play(file: url)
     try render(engine, seconds: 0.5)
+    await waitUntil { live.ring.count >= 40 }
     live.stop()
     // Offline rendering may or may not stamp buffers with a host time; either way nothing is wrong.
     if let offset = live.clock.offset { #expect(offset.isFinite) }
@@ -103,6 +111,7 @@ import Testing
     let live = LiveInput(ring: ColumnRing(capacity: 1024), engine: engine, requestAccess: { true })
     try await live.startMicrophone()
     try render(engine, seconds: 1)
+    await waitUntil { live.ring.count > 100 && live.spectrum.count > 100 }
     live.stop()
     #expect(live.ring.count > 100)
     #expect(live.spectrum.count > 100)
