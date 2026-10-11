@@ -15,4 +15,7 @@ swift run -c release WaveformApp --bench                # speed of the column ma
   samples counted from the start, so any buffer size gives the same columns.
 - `ColumnRing`: the audio thread writes, the screen reads, with no lock; a read that was overtaken is redone.
 - `Scale`: linear, or decibels so quiet speech is visible next to loud.
+- `OrbModel`: the dots on a sphere (even spacing), and the maths from columns to shape: height up the sphere = age of the sound (equator newest, poles oldest), push-out = loudness, dot size = peak.
 - `WaveformView`: two filled paths per frame; the row slides between column arrivals so 120 Hz screens look smooth.
+
+`swift run -c release WaveformApp --orb-snapshot out.png` writes four moments of the made-up voice as an orb.

@@ -63,19 +63,49 @@ if let path = value(after: "--snapshot") {
   exit(0)
 }
 
+if let path = value(after: "--orb-snapshot") {
+  MainActor.assumeIsolated {
+    // Several moments of the same made-up voice: silence, a word starting, a loud word, fading out.
+    let moments: [(String, Double)] = [("quiet", 1.9), ("word", 2.6), ("loud", 3.15), ("after", 4.3)]
+    var images: [NSImage] = []
+    for (_, seconds) in moments {
+      let view = OrbView(ring: prefilled(seconds: seconds), showStats: false, turning: false)
+        .frame(width: 360, height: 360)
+        .background(Color(red: 0.03, green: 0.06, blue: 0.06))
+      let renderer = ImageRenderer(content: view)
+      renderer.scale = 2
+      images.append(renderer.nsImage!)
+    }
+    let sheet = NSImage(size: NSSize(width: 360 * images.count, height: 360))
+    sheet.lockFocus()
+    for (i, image) in images.enumerated() { image.draw(in: NSRect(x: 360 * i, y: 0, width: 360, height: 360)) }
+    sheet.unlockFocus()
+    let png = NSBitmapImageRep(data: sheet.tiffRepresentation!)!.representation(using: .png, properties: [:])!
+    try! png.write(to: URL(fileURLWithPath: path))
+    print("wrote \(path)")
+  }
+  exit(0)
+}
+
 struct WaveformApp: App {
   @State private var ring = ColumnRing(capacity: 4096)
   @State private var input: LiveInput?
   @State private var scale: Scale = .decibels(floor: -60)
   @State private var logarithmic = true
+  @State private var orb = true
 
   var body: some Scene {
     WindowGroup("Waveform") {
       VStack(spacing: 0) {
-        WaveformView(ring: ring, scale: scale)
-          .background(Color(red: 0.03, green: 0.06, blue: 0.06))
-        Toggle("Decibels", isOn: $logarithmic).padding(8)
-          .onChange(of: logarithmic) { scale = logarithmic ? .decibels(floor: -60) : .linear }
+        Group {
+          if orb { OrbView(ring: ring, scale: scale) } else { WaveformView(ring: ring, scale: scale) }
+        }
+        .background(Color(red: 0.03, green: 0.06, blue: 0.06))
+        HStack {
+          Toggle("Orb", isOn: $orb)
+          Toggle("Decibels", isOn: $logarithmic)
+            .onChange(of: logarithmic) { scale = logarithmic ? .decibels(floor: -60) : .linear }
+        }.padding(8)
       }
       .frame(minWidth: 600, minHeight: 240)
       .task {
