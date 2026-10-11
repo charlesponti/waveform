@@ -24,8 +24,10 @@ struct FrameCanvas: View {
   let draw: (inout GraphicsContext, CGSize) -> Void
 
   var body: some View {
-    TimelineView(.animation) { _ in
+    TimelineView(.animation) { timeline in
       Canvas { context, size in
+        // Reading the date makes each tick a new drawing, so SwiftUI never reuses the last frame.
+        _ = timeline.date
         let began = CACurrentMediaTime()
         draw(&context, size)
         let ms = (CACurrentMediaTime() - began) * 1000

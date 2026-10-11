@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.1.2
+
+- Fix: inside a UIKit-hosted SwiftUI view the canvas could keep showing its first frame. Each timeline tick now draws a new frame.
+
 ## 0.1.1
 
 - `OrbView` and `SpectrumOrbView` take a `tint` colour (default mint, as before).
