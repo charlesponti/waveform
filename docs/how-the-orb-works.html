@@ -1,0 +1,1107 @@
+<meta charset="utf-8">
+<title>The Voice Orb</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500&family=IBM+Plex+Sans:wght@400;500;600&family=Instrument+Serif:ital@0;1&display=swap">
+<style>
+/* Layout: a sticky signal bar, then long parts of prose beside a live demo; one dark world, mint is "correct", amber is "naive". */
+:root {
+  --bg: #060b0b;
+  --panel: #0b1514;
+  --line: #17312d;
+  --fg: #d6e5e0;
+  --dim: #7f9a93;
+  --mint: #5eead4;
+  --amber: #ffb454;
+  --violet: #a78bfa;
+  --rose: #fb7185;
+  --display: "Instrument Serif", "Iowan Old Style", Georgia, serif;
+  --body: "IBM Plex Sans", system-ui, -apple-system, "Segoe UI", sans-serif;
+  --mono: "IBM Plex Mono", ui-monospace, "SF Mono", Menlo, monospace;
+  color-scheme: dark;
+}
+* { box-sizing: border-box; }
+html { scroll-behavior: smooth; }
+body {
+  margin: 0;
+  background: var(--bg);
+  color: var(--fg);
+  font: 400 17px/1.65 var(--body);
+  padding-inline: clamp(16px, 4vw, 40px);
+  padding-block: 0 80px;
+  -webkit-font-smoothing: antialiased;
+}
+main { max-width: 1120px; margin-inline: auto; }
+a { color: var(--mint); }
+h1, h2, h3 { font-family: var(--display); font-weight: 400; line-height: 1.05; text-wrap: balance; margin: 0; }
+h1 { font-size: clamp(44px, 8vw, 92px); letter-spacing: -0.01em; }
+h2 { font-size: clamp(34px, 5vw, 54px); }
+h3 { font-size: 26px; margin-top: 8px; }
+p { margin: 0 0 1em; max-width: 62ch; }
+code, .mono { font-family: var(--mono); font-size: 0.86em; }
+code { color: var(--mint); background: rgba(94, 234, 212, 0.08); padding: 1px 5px; border-radius: 4px; }
+.eyebrow { font: 500 12px/1 var(--mono); letter-spacing: 0.14em; text-transform: uppercase; color: var(--dim); margin-bottom: 14px; display: block; }
+.eyebrow b { color: var(--mint); font-weight: 500; }
+.lede { font-size: 20px; color: #b7cbc5; max-width: 52ch; }
+
+/* sticky bar */
+.bar {
+  position: sticky; top: env(safe-area-inset-top, 0px); z-index: 10;
+  margin-inline: calc(-1 * clamp(16px, 4vw, 40px));
+  padding: 10px clamp(16px, 4vw, 40px);
+  display: flex; gap: 10px 14px; align-items: center; flex-wrap: wrap;
+  background: rgba(6, 11, 11, 0.86); backdrop-filter: blur(10px);
+  border-bottom: 1px solid var(--line);
+}
+.bar .brand { font: 500 12px/1 var(--mono); letter-spacing: 0.14em; text-transform: uppercase; color: var(--dim); margin-right: 4px; }
+.chips { display: flex; gap: 6px; flex-wrap: wrap; }
+button, select {
+  font: 500 13px/1 var(--mono); color: var(--fg); background: var(--panel);
+  border: 1px solid var(--line); border-radius: 999px; padding: 8px 12px; cursor: pointer;
+}
+button:hover { border-color: var(--mint); }
+button:focus-visible, input:focus-visible, select:focus-visible { outline: 2px solid var(--mint); outline-offset: 2px; }
+button[aria-pressed="true"] { background: var(--mint); color: #04201c; border-color: var(--mint); }
+.bar .spacer { flex: 1; }
+select { border-radius: 8px; padding: 7px 8px; }
+
+/* parts */
+.hero { padding-block: clamp(36px, 6vw, 72px) 24px; display: grid; gap: 28px; grid-template-columns: minmax(0, 1fr); }
+.hero-orb { width: min(100%, 640px); margin-inline: auto; }
+.hero h1 em { color: var(--mint); font-style: italic; }
+.part { padding-block: 84px 12px; border-top: 1px solid var(--line); margin-top: 72px; scroll-margin-top: 70px; }
+.part.first { margin-top: 24px; }
+.cols { display: grid; gap: 40px; grid-template-columns: minmax(0, 5fr) minmax(0, 7fr); align-items: start; margin-top: 28px; }
+.cols.even { grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); }
+.sticky { position: sticky; top: 76px; }
+@media (max-width: 860px) { .cols, .cols.even { grid-template-columns: minmax(0, 1fr); gap: 24px; } .sticky { position: static; } }
+.demo { background: var(--panel); border: 1px solid var(--line); border-radius: 14px; padding: 12px; display: grid; gap: 10px; min-width: 0; }
+canvas { display: block; width: 100%; border-radius: 8px; }
+.controls { display: flex; flex-wrap: wrap; gap: 10px 18px; align-items: center; font: 400 13px/1.3 var(--mono); color: var(--dim); }
+.controls label { display: inline-flex; gap: 8px; align-items: center; }
+.controls output { color: var(--fg); min-width: 4.5ch; display: inline-block; }
+input[type=range] { accent-color: var(--mint); width: 150px; }
+input[type=checkbox], input[type=radio] { accent-color: var(--mint); }
+.readout { font: 400 13px/1.5 var(--mono); color: var(--dim); }
+.readout b { color: var(--fg); font-weight: 500; }
+.legend { display: flex; gap: 16px; flex-wrap: wrap; font: 400 12px/1 var(--mono); color: var(--dim); }
+.legend i { display: inline-block; width: 18px; height: 3px; border-radius: 2px; margin-right: 6px; vertical-align: middle; }
+.amber { color: var(--amber); }
+.mintc { color: var(--mint); }
+.eq {
+  font: 400 15px/1.7 var(--mono); color: var(--fg); background: rgba(94, 234, 212, 0.05);
+  border-left: 2px solid var(--mint); padding: 10px 14px; margin: 0 0 1.2em; border-radius: 0 8px 8px 0;
+  overflow-x: auto; white-space: pre;
+}
+.eq small { color: var(--dim); font-size: 12px; }
+pre.code {
+  font: 400 13.5px/1.6 var(--mono); background: #040909; border: 1px solid var(--line);
+  border-radius: 10px; padding: 14px 16px; overflow-x: auto; margin: 0 0 1.2em; color: #c3d6d0;
+}
+pre.code .c { color: #5f7c75; } pre.code .k { color: var(--mint); } pre.code .n { color: var(--amber); }
+.problems { display: grid; gap: 12px; grid-template-columns: repeat(auto-fit, minmax(210px, 1fr)); margin-top: 28px; }
+.problem { border: 1px solid var(--line); border-radius: 12px; padding: 14px 16px; background: var(--panel); text-decoration: none; color: var(--fg); display: block; }
+.problem:hover { border-color: var(--amber); }
+.problem b { display: block; font: 500 12px/1 var(--mono); color: var(--amber); letter-spacing: 0.1em; text-transform: uppercase; margin-bottom: 8px; }
+.problem span { font-size: 15px; line-height: 1.45; display: block; color: #b7cbc5; }
+.problem em { font: 400 12px/1 var(--mono); color: var(--dim); font-style: normal; display: block; margin-top: 10px; }
+.table { overflow-x: auto; border: 1px solid var(--line); border-radius: 12px; }
+table { border-collapse: collapse; width: 100%; font-size: 14px; min-width: 560px; }
+th, td { text-align: left; padding: 10px 14px; border-bottom: 1px solid var(--line); vertical-align: top; }
+th { font: 500 12px/1 var(--mono); letter-spacing: 0.1em; text-transform: uppercase; color: var(--dim); }
+tr:last-child td { border-bottom: 0; }
+td:first-child { font-family: var(--mono); font-size: 13px; color: var(--mint); white-space: nowrap; }
+.note { font-size: 14px; color: var(--dim); max-width: 62ch; }
+.look { border-left: 2px solid var(--amber); padding: 2px 0 2px 14px; color: #c9dad5; max-width: 52ch; min-height: 5.5em; }
+.look b { color: var(--amber); font-weight: 500; }
+footer { margin-top: 96px; border-top: 1px solid var(--line); padding-top: 28px; color: var(--dim); font-size: 14px; }
+@media (prefers-reduced-motion: reduce) { html { scroll-behavior: auto; } }
+</style>
+
+<header class="bar" id="top">
+  <span class="brand">Signal</span>
+  <div class="chips" id="chips" role="group" aria-label="Choose a sound"></div>
+  <span class="spacer"></span>
+  <button id="snd" aria-pressed="false" title="Play the signal through your speakers, and let the audio clock drive the pictures">Sound off</button>
+  <button id="pause" aria-pressed="false">Pause</button>
+</header>
+
+<main>
+<section class="hero">
+  <div>
+    <span class="eyebrow">Waveform experiment <b>/</b> Swift, Accelerate, no Metal</span>
+    <h1>An orb that <em>listens</em></h1>
+    <p class="lede" style="margin-top:20px">Every dot is one moment of sound at one pitch. Hum, whistle or drum and different parts of the sphere move. This page builds it from the version that does not work to the one that does, with the maths and the engineering at each step.</p>
+  </div>
+  <div class="hero-orb"><canvas id="hero" style="aspect-ratio:1/1"></canvas></div>
+  <p class="note" style="margin-inline:auto;text-align:center">Synthetic sounds, drawn the way the app draws a live microphone. Pick a different one in the bar above, and press Sound to hear it.</p>
+</section>
+
+<!-- ============================ NAIVE ============================ -->
+<section class="part first" id="naive">
+  <span class="eyebrow"><b>Start here</b> / the obvious version</span>
+  <h2>One number, one sphere</h2>
+  <div class="cols">
+    <div>
+      <p>A sphere of dots. Measure how loud the sound is right now. Push every dot out by that amount. It takes about ten lines and it does react to sound.</p>
+<pre class="code"><code>// every audio buffer
+let loudness = buffer.map(abs).max()   // 0...1
+
+// every screen frame
+for dot in dots {
+  dot.radius = 1 + 0.5 * loudness
+}</code></pre>
+      <p>Try the Arpeggio, then the Hiss, then the Vowels. They are very different sounds and the orb does the same thing for all of them: it breathes. It cannot say which pitch, it has no memory of what came before, and the amber line on the right moves in steps.</p>
+    </div>
+    <div class="demo">
+      <canvas id="naiveOrb" style="aspect-ratio:1.35/1"></canvas>
+      <canvas id="naiveScope" style="aspect-ratio:4.2/1"></canvas>
+      <div class="legend"><span><i style="background:var(--amber)"></i>the one number the orb uses</span><span><i style="background:#2a4a44"></i>what the sound really did</span></div>
+      <div class="readout">The steps are audio buffers arriving (40 ms here, 10 to 20 ms on a phone) while the screen draws at 60 or 120 Hz.</div>
+    </div>
+  </div>
+  <div class="problems">
+    <a class="problem" href="#columns"><b>Drift</b><span>Which samples belong to which frame? Round the wrong way and the picture slowly slides off the sound.</span><em>Part 2, exact columns</em></a>
+    <a class="problem" href="#loudness"><b>Flicker</b><span>The peak of a few milliseconds depends on where in a pitch wave you happened to land.</span><em>Part 3, loudness</em></a>
+    <a class="problem" href="#time"><b>No memory</b><span>Only "now" is drawn. A sound that just ended is gone.</span><em>Part 4, time on a sphere</em></a>
+    <a class="problem" href="#smooth"><b>Stair-steps</b><span>Audio arrives on its own schedule and the screen draws on another.</span><em>Part 5, playhead</em></a>
+    <a class="problem" href="#pitch"><b>One number</b><span>A hum, a whistle and a hiss can be equally loud. The sphere cannot tell them apart.</span><em>Part 6, pitch</em></a>
+    <a class="problem" href="#ring"><b>Two threads</b><span>The audio thread may not wait for the screen, and the screen must not read half-written data.</span><em>Part 7, lock-free ring</em></a>
+  </div>
+</section>
+
+<!-- ============================ FINISHED ============================ -->
+<section class="part" id="finished">
+  <span class="eyebrow"><b>The result</b> / what the finished orb does</span>
+  <h2>A spectrogram wrapped round a sphere</h2>
+  <div class="cols">
+    <div>
+      <p>Where a dot sits down the sphere is time: the equator is the newest sound, and each moment ripples toward both poles as it ages. Where a dot sits round the sphere is pitch: low on one meridian, high on the opposite one. How far a dot is pushed out, and how large it is drawn, is how loud that pitch was at that moment.</p>
+      <p>The map on the right is the same data laid flat. Drag the slider to wrap it up.</p>
+      <div class="look" id="look"></div>
+      <div class="controls" style="margin-top:14px">
+        <label>Flat <input type="range" id="wrap" min="0" max="1" step="0.01" value="1" aria-label="Wrap the map into a sphere"> Orb</label>
+        <label><input type="checkbox" id="byPitch"> colour by pitch</label>
+      </div>
+    </div>
+    <div class="demo">
+      <canvas id="showOrb" style="aspect-ratio:1.25/1"></canvas>
+      <canvas id="showMap" style="aspect-ratio:2.1/1"></canvas>
+      <div class="readout">Bottom of the map: the newest sound. Top: 0.8 seconds ago. Left to right: 80 Hz to 7 kHz on a log scale, which is also front to back round the orb.</div>
+    </div>
+  </div>
+</section>
+
+<!-- ============================ DEEP DIVE ============================ -->
+<section class="part" id="columns">
+  <span class="eyebrow"><b>Part 2</b> / maths and engineering</span>
+  <h2>Cut time into exact columns</h2>
+  <div class="cols">
+    <div>
+      <p>Everything after this works on columns: fixed slices of time, each summarised by the lowest sample, the highest sample and the root mean square. The orb never touches raw samples again.</p>
+      <p>The edges have to be exact. A phone records at 44.1 or 48 kHz, and 120 columns a second does not divide 44,100. A column is 367.5 samples long. Truncate it to 367 and every column is a little short, so after a minute the picture has run ahead of the sound.</p>
+<pre class="code"><code>// the edge of column k is placed from the running sample count
+static func edge(_ k: Int, _ sampleRate: Double, _ rate: Double) -> Int {
+  Int((Double(k) * sampleRate / rate).rounded())
+}</code></pre>
+      <div class="eq">edge(k) = round( k · sampleRate / columnsPerSecond )
+<small>no running sum of rounded lengths, so errors cannot add up</small></div>
+      <p>Buffers from the microphone do not line up with columns either. The builder takes whatever it is given (512 samples, 441, 1) and finishes a column wherever an edge falls inside the buffer. The three summaries come from single vDSP calls, so this is cheap enough for the audio thread.</p>
+    </div>
+    <div class="demo">
+      <canvas id="colsCanvas" style="aspect-ratio:2.2/1"></canvas>
+      <div class="controls">
+        <label>columns per second <input type="range" id="colCps" min="40" max="400" step="5" value="125"><output id="colCpsOut">125</output></label>
+        <label>recorded at <select id="colSr"><option value="44100">44.1 kHz</option><option value="48000">48 kHz</option></select></label>
+      </div>
+      <div class="legend"><span><i style="background:var(--mint)"></i>lowest to highest sample</span><span><i style="background:var(--amber)"></i>rms</span></div>
+      <div class="readout" id="colCalc"></div>
+    </div>
+  </div>
+</section>
+
+<section class="part" id="loudness">
+  <span class="eyebrow"><b>Part 3</b> / maths</span>
+  <h2>Loudness without flicker</h2>
+  <div class="cols">
+    <div>
+      <p>Root mean square is the sound's energy rather than its biggest swing:</p>
+      <div class="eq">rms = √( (x₁² + x₂² + … + xₙ²) / n )</div>
+      <p>A voice at 120 Hz repeats every 8.3 ms. If a column is shorter than that, its rms depends on which part of the wave it landed on: near a crest it is high, near a zero crossing it is low. Neighbouring columns disagree and the orb shimmers, even though the voice is steady.</p>
+      <p>The fix is to measure over a window of a few pitch periods. The builder keeps the last 25 ms of column sums and reports the rms of all of them. Drag the column length down and watch the amber line start to shake while the mint one holds still.</p>
+      <p>Then the shape of the response. Instant attack, so a hit shows at once. A release with a time constant (150 ms by default), so a sound fades the way a meter needle does, not as a flash.</p>
+      <div class="eq">level[k] = max( rms[k], level[k−1] · e^(−1 / (rate · release)) )</div>
+      <p>Last, the scale. Speech spans 60 dB or more, so linear height makes a quiet word invisible next to a loud one. Heights are decibels:</p>
+      <div class="eq">dB = 20 · log₁₀(amplitude)
+height = clamp( (dB − floor) / −floor, 0, 1 )   <small>floor = −60 dB</small></div>
+    </div>
+    <div class="demo">
+      <canvas id="flickCanvas" style="aspect-ratio:2.3/1"></canvas>
+      <div class="controls"><label>column length <input type="range" id="flickMs" min="2" max="40" step="1" value="4"><output id="flickOut">4 ms</output></label></div>
+      <div class="legend"><span><i style="background:var(--amber)"></i>rms of one column</span><span><i style="background:var(--mint)"></i>rms of the last 25 ms</span><span><i style="background:#2a4a44"></i>true envelope</span></div>
+      <canvas id="ballCanvas" style="aspect-ratio:2.3/1"></canvas>
+      <div class="controls"><label>release <input type="range" id="release" min="0.02" max="0.6" step="0.01" value="0.15"><output id="releaseOut">150 ms</output></label></div>
+      <div class="readout">Left: how amplitude becomes height. Right: the current sound, windowed rms (grey) and the level the orb uses (mint).</div>
+    </div>
+  </div>
+</section>
+
+<section class="part" id="time">
+  <span class="eyebrow"><b>Part 4</b> / maths</span>
+  <h2>Time on a sphere</h2>
+  <div class="cols">
+    <div>
+      <p>Dots need to sit evenly on a sphere, with no clumps at the poles and no visible rows. The Fibonacci lattice does that with one loop. Heights are evenly spaced, and each dot is turned by the golden angle from the one before.</p>
+      <div class="eq">yᵢ = 1 − 2(i + ½) / N
+θᵢ = i · π(3 − √5)       <small>≈ 137.5°, the golden angle</small>
+(x, z) = √(1 − y²) · (cos θ, sin θ)</div>
+      <p>Height gives age. The equator is the newest column and the poles are the oldest, so each new sound appears as a ring at the equator and spreads toward both poles as it ages:</p>
+      <div class="eq">age = |asin y| / (π/2)          <small>0 at the equator, 1 at a pole</small>
+column shown = playhead − age · history</div>
+      <p>The history slider is how many seconds the sphere spans. The orb in the app uses 0.8.</p>
+    </div>
+    <div class="demo">
+      <canvas id="timeOrb" style="aspect-ratio:1.15/1"></canvas>
+      <div class="controls">
+        <label>history <input type="range" id="hist" min="0.3" max="2" step="0.05" value="0.8"><output id="histOut">0.80 s</output></label>
+        <label><input type="checkbox" id="byAge" checked> colour by age</label>
+      </div>
+      <div class="readout">Mint is now. Violet is the oldest sound the sphere still shows. Loudness only here; the next parts add smoothness and pitch.</div>
+    </div>
+  </div>
+</section>
+
+<section class="part" id="smooth">
+  <span class="eyebrow"><b>Part 5</b> / maths and engineering</span>
+  <h2>A playhead on the audio clock</h2>
+  <div class="cols">
+    <div>
+      <p>A screen frame should not ask "what is the newest column?". Columns appear when the audio thread is scheduled, which jitters, so the newest column is a moving, stepping target. Instead the audio thread tells a shared clock when each buffer started, and the screen asks "where in the stream is now, minus a fixed delay?"</p>
+<pre class="code"><code>// StreamClock: smooth the offset between audio time and host time
+smoothed += gain * (raw - smoothed)       // gain = 0.02
+
+// Playhead: draw a fixed moment behind the audio
+position = min(newest - 1,
+               streamTime(hostNow - latency) * rate - 0.5)</code></pre>
+      <p>The latency (60 ms) covers the audio buffer, the time to finish a column, and the one column of look-ahead the interpolation needs.</p>
+      <p>The system also reports frame times with a millisecond or two of noise. Used raw, that noise becomes shake. A phase-locked loop follows the steady beat of the frames:</p>
+<pre class="code"><code>predicted = phase + period
+error = clamp(measured - predicted, -period, 2 * period)
+period += 0.01 * error
+phase  = predicted + 0.15 * error</code></pre>
+      <p>Last, the playhead lands between two columns. Reading the nearest one gives steps. Linear gives a corner at every column. Catmull-Rom runs a cubic through the four neighbours, so the value and its slope are both continuous:</p>
+      <div class="eq">p(t) = ½ · [ 2p₁ + (p₂ − p₀)t + (2p₀ − 5p₁ + 4p₂ − p₃)t² + (3p₁ − p₀ − 3p₂ + p₃)t³ ]</div>
+    </div>
+    <div class="demo">
+      <canvas id="smoothCanvas" style="aspect-ratio:2/1"></canvas>
+      <div class="controls" role="radiogroup" aria-label="How the screen reads the columns">
+        <label><input type="radio" name="rd" value="latest"> newest column</label>
+        <label><input type="radio" name="rd" value="nearest"> nearest</label>
+        <label><input type="radio" name="rd" value="linear"> linear</label>
+        <label><input type="radio" name="rd" value="cubic" checked> cubic</label>
+      </div>
+      <div class="controls">
+        <label>columns per second <input type="range" id="smCps" min="15" max="125" step="5" value="40"><output id="smCpsOut">40</output></label>
+        <label><input type="checkbox" id="smJit" checked> noisy frame times</label>
+        <label><input type="checkbox" id="smPll" checked> smooth them (PLL)</label>
+      </div>
+      <div class="legend"><span><i style="background:var(--mint)"></i>drawn each frame</span><span><i style="background:#2a4a44"></i>what the sound did</span></div>
+      <div class="readout" id="smRough"></div>
+    </div>
+  </div>
+</section>
+
+<section class="part" id="pitch">
+  <span class="eyebrow"><b>Part 6</b> / maths</span>
+  <h2>Pitch: a spectrum every column</h2>
+  <div class="cols">
+    <div>
+      <p>For each column the last <code>N</code> samples go through a Hann window and a Fourier transform. A window is needed because the transform assumes the slice repeats forever. Cut a tone off sharply and the seam spreads its energy across every frequency. Switch the window off on the right to see the skirts.</p>
+      <div class="eq">w[n] = ½ − ½ cos(2πn / N)</div>
+      <p>The numbers are scaled so they mean something. A pure tone of amplitude A should read A/√2, its rms, in whichever band it falls in. With Σw² the window's energy and X the transform:</p>
+      <div class="eq">power[k] = 2 · |X[k]|² / (N · Σw²)
+band power = Σ power[k] over the bins inside the band
+band value = √(band power)         <small>a sine A gives A / √2</small></div>
+      <p>Bands are 24 steps on a log scale from 80 Hz to 8 kHz, so each is the same musical width (a little over three semitones). A band edge rarely falls on a bin, so the bin it cuts through is counted by the fraction inside. The band powers add up to the signal's mean square, which the tests check.</p>
+      <p>Speech loses 6 dB or more per octave, so the top bands would sit near silence. A display tilt adds <code>tilt</code> dB per octave above 1 kHz. Set it to 0 and the numbers are exact.</p>
+      <p>One more detail: a window of <code>N</code> samples describes the moment half a window ago. The orb reads the spectrum <code>N/2</code> samples later than the loudness, so a vowel's pitch and its volume line up.</p>
+    </div>
+    <div class="demo">
+      <canvas id="fftCanvas" style="aspect-ratio:1.55/1"></canvas>
+      <div class="controls">
+        <label><input type="checkbox" id="useHann" checked> Hann window</label>
+        <label>tilt <input type="range" id="tilt" min="0" max="6" step="0.5" value="3"><output id="tiltOut">3 dB/oct</output></label>
+        <label>bands <input type="range" id="nbands" min="8" max="48" step="1" value="24"><output id="nbandsOut">24</output></label>
+      </div>
+      <div class="controls"><button id="checkNorm">Check the scaling</button></div>
+      <div class="readout" id="normOut">A sine of amplitude 0.5 should read 0.354 and have mean square 0.125.</div>
+    </div>
+  </div>
+</section>
+
+<section class="part" id="ring">
+  <span class="eyebrow"><b>Part 7</b> / engineering</span>
+  <h2>Two threads, no lock</h2>
+  <div class="cols">
+    <div>
+      <p>The microphone callback runs on a real-time thread with a deadline of a few milliseconds. It must never wait for the screen, take a lock, allocate memory, or print. The screen thread has to read what it wrote.</p>
+      <p>The answer is a ring: a fixed array and one counter. The audio thread writes into the slot, then publishes the new count with a release store. The screen thread loads the count with an acquire load, so it can never see a slot that is still being filled.</p>
+<pre class="code"><code>func append(_ column: Column) {            // audio thread only
+  let index = written.load(ordering: .relaxed)
+  slots[index &amp; mask] = column
+  written.store(index + 1, ordering: .releasing)
+}
+
+func snapshot(...) {                       // screen thread only
+  while true {
+    let end = written.load(ordering: .acquiring)
+    copy the newest n slots
+    // the writer lapped us mid-copy? throw it away and copy again
+    if written.load(ordering: .acquiring) - (end - real) &lt;= capacity { return }
+  }
+}</code></pre>
+      <p>The size is a power of two, so wrapping is a bitwise and instead of a modulo. The retry means what is drawn is never a mixture of old and new. Press the button to force the writer to lap the reader and watch the copy start again.</p>
+    </div>
+    <div class="demo">
+      <canvas id="ringCanvas" style="aspect-ratio:1.45/1"></canvas>
+      <div class="controls"><button id="lap">Lap the reader</button></div>
+      <div class="readout" id="ringOut"></div>
+    </div>
+  </div>
+</section>
+
+<section class="part" id="tests">
+  <span class="eyebrow"><b>Part 8</b> / engineering</span>
+  <h2>Proving the maths</h2>
+  <div class="cols even">
+    <div>
+      <p>The risk in a picture is that it looks plausible while being wrong. So each piece of maths has a test with a known answer, written from the definition and not from what the code happens to output.</p>
+      <p>The tests run on the Mac with synthetic signals and need no microphone. There are 33 across the package.</p>
+    </div>
+    <div class="table">
+      <table>
+        <tr><th>Property</th><th>How it is checked</th></tr>
+        <tr><td>Exact columns</td><td>Feed audio in buffers of many sizes; the column count and edges match the sample count every time.</td></tr>
+        <tr><td>A / √2</td><td>A pure sine of amplitude A reads A/√2 in its spectrum band.</td></tr>
+        <tr><td>Energy</td><td>The squares of the band values add up to the signal's mean square.</td></tr>
+        <tr><td>Aligned hops</td><td>Spectrum frame k and column k end on the same sample.</td></tr>
+        <tr><td>No flicker</td><td>A windowed loudness varies far less than a single column's on a steady tone.</td></tr>
+        <tr><td>Pitch map</td><td>Each dot's pitch equals its longitude from the definition, the same on both sides.</td></tr>
+        <tr><td>Torn reads</td><td>A reader that is lapped by the writer retries and returns whole columns.</td></tr>
+      </table>
+    </div>
+  </div>
+</section>
+
+<section class="part" id="perf">
+  <span class="eyebrow"><b>Part 9</b> / engineering</span>
+  <h2>Does it need Metal?</h2>
+  <div class="cols even">
+    <div>
+      <p>The orb is 1,800 dots. The work per frame is small: about eight table reads per dot, then a rotation and a circle. Two choices keep it cheap in SwiftUI's Canvas. Dots are sorted into four depth layers and each layer is a single path with a single fill, so there are four draw calls and not 1,800. And nothing allocates inside the frame.</p>
+      <p>A readout in the corner of the app shows the average draw time. The rule for going to Metal is written down before measuring:</p>
+      <div class="eq">draw time &gt; ~4 ms at 120 Hz, or dropped frames  →  Metal
+(a 120 Hz frame is 8.3 ms; leave half of it for the system)</div>
+      <p>What Metal would add: exact frame pacing with CAMetalDisplayLink, twenty to fifty times more dots, and glow. If the Canvas stays under budget, none of that is worth the extra code.</p>
+    </div>
+    <div>
+      <div class="table">
+        <table>
+          <tr><th>Setting</th><th>Value in the app</th></tr>
+          <tr><td>sample rate</td><td>the microphone's, typically 48 kHz</td></tr>
+          <tr><td>columns per second</td><td>120</td></tr>
+          <tr><td>loudness window</td><td>25 ms, then 150 ms release</td></tr>
+          <tr><td>spectrum</td><td>2048-point FFT, 24 bands, 80 Hz to 8 kHz</td></tr>
+          <tr><td>display tilt</td><td>+3 dB per octave above 1 kHz</td></tr>
+          <tr><td>decibel floor</td><td>−60 dB loudness, −66 dB spectrum</td></tr>
+          <tr><td>playhead delay</td><td>60 ms</td></tr>
+          <tr><td>history</td><td>0.8 s across the sphere</td></tr>
+          <tr><td>dots</td><td>1,800, four depth layers</td></tr>
+          <tr><td>spin</td><td>0.12 rad/s, tipped 0.32 rad</td></tr>
+        </table>
+      </div>
+      <p class="note" style="margin-top:12px">The demos on this page run the same maths in JavaScript at 16 kHz with a 1024-point FFT, so everything works in a browser.</p>
+    </div>
+  </div>
+</section>
+
+<footer>
+  <p>The Swift package is <code>WaveformCore</code> (columns, rings, clocks, spectrum, orb model) and <code>WaveformApp</code> (the SwiftUI views). The plain orb is tagged <code>orb-v1</code>; this one lives on the <code>spectrum-orb</code> branch. Next to try: a damped wave along the time axis, and Metal if the draw time asks for it.</p>
+</footer>
+</main>
+
+<script>
+(() => {
+'use strict';
+
+/* ---------- constants and helpers ---------- */
+const SR = 16000, CPS = 125, HOP = SR / CPS, FFT_N = 1024, NB = 24, LO_HZ = 80, HI_HZ = 7000, DUR = 8;
+const TAU = Math.PI * 2;
+const FLOOR_L = -60, FLOOR_S = -66;
+const SPEC_DELAY = FFT_N / 2 / SR * CPS - 0.5;
+const clamp = (x, a, b) => (x < a ? a : x > b ? b : x);
+const lerp = (a, b, t) => a + (b - a) * t;
+const mod = (a, n) => ((a % n) + n) % n;
+const $ = id => document.getElementById(id);
+const reduceMotion = matchMedia('(prefers-reduced-motion: reduce)').matches;
+const css = n => getComputedStyle(document.documentElement).getPropertyValue(n).trim();
+const C = { mint: css('--mint'), amber: css('--amber'), violet: css('--violet'), dim: css('--dim'), line: css('--line'), fg: css('--fg'), faint: '#2a4a44' };
+const toDisp = (v, floor) => clamp((20 * Math.log10(Math.max(v, 1e-9)) - floor) / -floor, 0, 1);
+
+function rng(seed) {
+  let a = seed >>> 0;
+  return () => {
+    a = (a + 0x6D2B79F5) | 0;
+    let t = Math.imul(a ^ (a >>> 15), 1 | a);
+    t = (t + Math.imul(t ^ (t >>> 7), 61 | t)) ^ t;
+    return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
+  };
+}
+
+function fit(canvas) {
+  const dpr = Math.min(window.devicePixelRatio || 1, 2);
+  const w = canvas.clientWidth, h = canvas.clientHeight;
+  if (canvas.width !== Math.round(w * dpr) || canvas.height !== Math.round(h * dpr)) {
+    canvas.width = Math.round(w * dpr); canvas.height = Math.round(h * dpr);
+  }
+  const ctx = canvas.getContext('2d');
+  ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+  return { ctx, w, h };
+}
+
+function text(ctx, s, x, y, color, size = 11, align = 'left') {
+  ctx.font = `400 ${size}px "IBM Plex Mono", ui-monospace, monospace`;
+  ctx.fillStyle = color; ctx.textAlign = align; ctx.textBaseline = 'alphabetic';
+  ctx.fillText(s, x, y);
+}
+
+/* ---------- FFT ---------- */
+function makeFFT(n) {
+  const cosT = new Float64Array(n / 2), sinT = new Float64Array(n / 2), rev = new Uint32Array(n);
+  const bits = Math.log2(n) | 0;
+  for (let i = 0; i < n / 2; i++) { cosT[i] = Math.cos(TAU * i / n); sinT[i] = Math.sin(TAU * i / n); }
+  for (let i = 0; i < n; i++) { let r = 0; for (let b = 0; b < bits; b++) if (i & (1 << b)) r |= 1 << (bits - 1 - b); rev[i] = r; }
+  return (re, im) => {
+    for (let i = 0; i < n; i++) { const j = rev[i]; if (j > i) { let t = re[i]; re[i] = re[j]; re[j] = t; t = im[i]; im[i] = im[j]; im[j] = t; } }
+    for (let size = 2; size <= n; size <<= 1) {
+      const half = size >> 1, step = n / size;
+      for (let i = 0; i < n; i += size) {
+        for (let j = i, k = 0; j < i + half; j++, k += step) {
+          const l = j + half;
+          const tr = re[l] * cosT[k] + im[l] * sinT[k];
+          const ti = im[l] * cosT[k] - re[l] * sinT[k];
+          re[l] = re[j] - tr; im[l] = im[j] - ti; re[j] += tr; im[j] += ti;
+        }
+      }
+    }
+  };
+}
+const fft = makeFFT(FFT_N);
+const hann = Float64Array.from({ length: FFT_N }, (_, n) => 0.5 - 0.5 * Math.cos(TAU * n / FFT_N));
+const sumW2 = hann.reduce((a, w) => a + w * w, 0);
+const fre = new Float64Array(FFT_N), fim = new Float64Array(FFT_N);
+const fpow = new Float64Array(FFT_N / 2), fcum = new Float64Array(FFT_N / 2 + 1);
+const bandCache = {};
+function bandsFor(nb) {
+  if (bandCache[nb]) return bandCache[nb];
+  const edgesHz = Array.from({ length: nb + 1 }, (_, i) => LO_HZ * Math.pow(HI_HZ / LO_HZ, i / nb));
+  const bin = edgesHz.map(f => f * FFT_N / SR);
+  const centre = Array.from({ length: nb }, (_, b) => Math.sqrt(edgesHz[b] * edgesHz[b + 1]));
+  return (bandCache[nb] = { edgesHz, bin, centre });
+}
+
+/* Linear rms per band for the FFT_N samples ending at `end` (looping over the signal). */
+function analyseFrame(sig, end, o, out) {
+  const len = sig.length, half = FFT_N / 2;
+  for (let n = 0; n < FFT_N; n++) {
+    const x = sig[mod(end - FFT_N + n, len)];
+    fre[n] = o.hann ? x * hann[n] : x; fim[n] = 0;
+  }
+  fft(fre, fim);
+  const norm = 2 / (FFT_N * (o.hann ? sumW2 : FFT_N));
+  fpow[0] = 0;
+  for (let k = 1; k < half; k++) fpow[k] = (fre[k] * fre[k] + fim[k] * fim[k]) * norm;
+  fcum[0] = 0;
+  for (let k = 0; k < half; k++) fcum[k + 1] = fcum[k] + fpow[k];
+  const cumTo = x => { const u = Math.max(0, x + 0.5); const i = Math.min(half - 1, Math.floor(u)); return fcum[i] + fpow[i] * Math.min(1, u - i); };
+  const { bin, centre } = bandsFor(o.nb);
+  for (let b = 0; b < o.nb; b++) {
+    const p = Math.max(0, cumTo(bin[b + 1]) - cumTo(bin[b]));
+    const gain = Math.pow(10, o.tilt * Math.log2(centre[b] / 1000) / 10);
+    out[b] = Math.sqrt(p * gain);
+  }
+  return out;
+}
+
+/* ---------- signals ---------- */
+const fade = x => { const n = Math.round(SR * 0.008); for (let i = 0; i < n; i++) { const g = i / n; x[i] *= g; x[x.length - 1 - i] *= g; } return x; };
+function normalise(x, peak = 0.8) { let m = 1e-9; for (let i = 0; i < x.length; i++) m = Math.max(m, Math.abs(x[i])); const g = peak / m; for (let i = 0; i < x.length; i++) x[i] *= g; return fade(x); }
+const blank = () => new Float32Array(SR * DUR);
+
+const SIGNALS = {
+  hum: {
+    label: 'Hum',
+    look: '<b>A low hum</b> glows on one side of the orb only: a fundamental near 110 Hz and two harmonics, stacked on the left of the map. Its slow swell breathes in and out, and its vibrato makes the glow wobble sideways a little.',
+    make() {
+      const x = blank(); let ph = 0;
+      for (let i = 0; i < x.length; i++) {
+        const t = i / SR, f = 110 + 4 * Math.sin(TAU * 5 * t) + 6 * Math.sin(TAU * 0.25 * t);
+        ph += TAU * f / SR;
+        const env = 0.62 + 0.38 * Math.sin(TAU * 0.5 * t - 1);
+        x[i] = env * (Math.sin(ph) + 0.5 * Math.sin(2 * ph) + 0.25 * Math.sin(3 * ph));
+      }
+      return normalise(x);
+    }
+  },
+  whistle: {
+    label: 'Whistle',
+    look: '<b>A whistle</b> is one thin line, far round on the other side. Its pitch glides up and down, so the line slides across the sphere, and because older sound sits nearer the poles it leaves a curved trail behind it.',
+    make() {
+      const x = blank(); let ph = 0;
+      for (let i = 0; i < x.length; i++) {
+        const t = i / SR, f = 2300 + 900 * Math.sin(TAU * 0.25 * t);
+        ph += TAU * f / SR;
+        x[i] = (0.65 + 0.35 * Math.sin(TAU * 0.5 * t)) * Math.sin(ph);
+      }
+      return normalise(x);
+    }
+  },
+  arpeggio: {
+    label: 'Arpeggio',
+    look: '<b>A plucked arpeggio</b> climbs the pitch axis one note at a time. Each note lights a new spot and then fades from the equator outwards, so on the map the notes make a diagonal staircase, and on the orb a spiral of rings.',
+    make() {
+      const x = blank(), notes = [196, 392, 784, 1568];
+      for (let bar = 0; bar < DUR / 2; bar++) notes.forEach((f, n) => {
+        const start = Math.round((bar * 2 + n * 0.5) * SR), len = Math.round(0.9 * SR);
+        for (let i = 0; i < len && start + i < x.length; i++) {
+          const t = i / SR, env = Math.min(1, t / 0.005) * Math.exp(-t / 0.28);
+          x[start + i] += env * (Math.sin(TAU * f * t) + 0.35 * Math.sin(TAU * 2 * f * t));
+        }
+      });
+      return normalise(x);
+    }
+  },
+  hiss: {
+    label: 'Hiss',
+    look: '<b>An "sss"</b> is noise, and noise has every pitch at once, mostly high. The whole high side of the orb lights together, as a wide band round the sphere, and then it all goes dark in the gap before the next one.',
+    make() {
+      const x = blank(), r = rng(7); let prev = 0;
+      for (let i = 0; i < x.length; i++) {
+        const n = r() * 2 - 1, d = n - prev; prev = n;
+        const t = i / SR, u = (t % 1) / 0.45;
+        const env = u < 1 ? Math.pow(Math.sin(Math.PI * u), 2) : 0;
+        x[i] = d * env;
+      }
+      return normalise(x);
+    }
+  },
+  drums: {
+    label: 'Drums',
+    look: '<b>A drum loop</b> uses all three zones. The kick is a low blob, the snare is a short burst across the middle that the hat tops with a bright ring high up, and each hit is a ring at the equator that spreads out to the poles as it ages.',
+    make() {
+      const x = blank(), r = rng(3);
+      const add = (t0, len, fn) => { const s = Math.round(t0 * SR); for (let i = 0; i < Math.round(len * SR) && s + i < x.length; i++) x[s + i] += fn(i / SR); };
+      for (let bar = 0; bar < DUR / 2; bar++) {
+        const b = bar * 2;
+        [0, 1].forEach(k => add(b + k, 0.35, t => { const f = 45 + 90 * Math.exp(-t / 0.04); return Math.exp(-t / 0.11) * Math.sin(TAU * f * t) * 1.1; }));
+        [0.5, 1.5].forEach(k => add(b + k, 0.25, t => Math.exp(-t / 0.07) * ((r() * 2 - 1) * 0.7 + 0.5 * Math.sin(TAU * 190 * t))));
+        for (let h = 0; h < 8; h++) add(b + h * 0.25 + 0.125, 0.06, t => Math.exp(-t / 0.014) * (r() * 2 - 1) * 0.35);
+      }
+      let prev = 0; for (let i = 0; i < x.length; i++) { const hp = x[i] - 0.995 * prev; prev = x[i]; x[i] = x[i] * 0.85 + hp * 0.15; }
+      return normalise(x);
+    }
+  },
+  vowels: {
+    label: 'Vowels',
+    look: '<b>A voice</b> is a buzz at a steady pitch, shaped by two resonances that move as the mouth changes shape, "ah" to "ee" to "oo". They show as two bright bumps that slide along the pitch axis, with the buzz\'s harmonics as fine ridges under them.',
+    make() {
+      const x = blank(), count = x.length, block = 160;
+      const targets = [[700, 1200], [300, 2300], [320, 800], [700, 1200]];
+      const res = (f, c, w) => 1 / (1 + Math.pow((f - c) / w, 2));
+      const ph = new Float64Array(60), gains = new Float64Array(60);
+      for (let start = 0; start < count; start += block) {
+        const t = start / SR, pos = (t * 0.55) % 3, idx = Math.floor(pos), mix = pos - idx;
+        const f1 = lerp(targets[idx][0], targets[idx + 1][0], mix), f2 = lerp(targets[idx][1], targets[idx + 1][1], mix);
+        const pitch = 118 + 22 * Math.sin(TAU * 0.6 * t) + 8 * Math.sin(TAU * 3.1 * t);
+        const nh = Math.min(59, Math.floor(7000 / pitch));
+        for (let h = 1; h <= nh; h++) { const f = pitch * h; gains[h] = (res(f, f1, 110) + 0.7 * res(f, f2, 180)) / Math.sqrt(h); }
+        for (let i = start; i < Math.min(count, start + block); i++) {
+          const tt = i / SR, p = 118 + 22 * Math.sin(TAU * 0.6 * tt) + 8 * Math.sin(TAU * 3.1 * tt);
+          let s = 0;
+          for (let h = 1; h <= nh; h++) { ph[h] += TAU * p * h / SR; s += gains[h] * Math.sin(ph[h]); }
+          const syl = Math.pow(Math.max(0, Math.sin(TAU * 3.2 * tt)), 1.2);
+          const word = 0.5 + 0.5 * Math.sin(TAU * 0.45 * tt - 0.5);
+          x[i] = s * syl * (word > 0.3 ? 1 : 0) * (0.5 + 0.5 * word);
+        }
+      }
+      return normalise(x);
+    }
+  }
+};
+const ORDER = ['vowels', 'hum', 'whistle', 'arpeggio', 'hiss', 'drums'];
+
+/* ---------- analysis ---------- */
+function columns(sig, cps, win = 0.025, rel = 0.15) {
+  const n = Math.floor(sig.length * cps / SR);
+  const lo = new Float32Array(n), hi = new Float32Array(n), rms = new Float32Array(n), level = new Float32Array(n);
+  const wb = Math.max(1, Math.round(win * cps)), sq = new Float64Array(wb), cnt = new Int32Array(wb);
+  const decay = Math.exp(-1 / (cps * Math.max(rel, 1e-6)));
+  let a = 0, lv = 0;
+  for (let k = 0; k < n; k++) {
+    const b = Math.round((k + 1) * SR / cps);
+    let l = Infinity, h = -Infinity, s = 0;
+    for (let i = a; i < b; i++) { const v = sig[i]; if (v < l) l = v; if (v > h) h = v; s += v * v; }
+    sq[k % wb] = s; cnt[k % wb] = b - a;
+    let ss = 0, cc = 0; for (let j = 0; j < wb; j++) { ss += sq[j]; cc += cnt[j]; }
+    const r = Math.sqrt(ss / Math.max(1, cc));
+    lv = Math.max(r, lv * decay);
+    lo[k] = l; hi[k] = h; rms[k] = r; level[k] = lv; a = b;
+  }
+  return { n, lo, hi, rms, level };
+}
+
+const cache = {};
+function get(name) {
+  if (cache[name]) return cache[name];
+  const sig = SIGNALS[name].make();
+  const c = columns(sig, CPS, 0.025, 0.15);
+  const A = { name, sig, n: c.n, rms: c.rms, level: c.level };
+  A.lvl = Float32Array.from(c.level, v => toDisp(v, FLOOR_L));
+  A.pk = Float32Array.from(c.lo, (v, k) => toDisp(Math.max(Math.abs(v), Math.abs(c.hi[k])), FLOOR_L));
+  A.spec = new Float32Array(c.n * NB);
+  const tmp = new Float64Array(NB), o = { hann: true, tilt: 3, nb: NB };
+  for (let k = 0; k < c.n; k++) {
+    analyseFrame(sig, Math.round((k + 1) * HOP), o, tmp);
+    for (let b = 0; b < NB; b++) A.spec[k * NB + b] = toDisp(tmp[b], FLOOR_S);
+  }
+  return (cache[name] = A);
+}
+
+function cubic(arr, pos, n, stride = 1, off = 0) {
+  const i = Math.floor(pos), t = pos - i;
+  const p0 = arr[mod(i - 1, n) * stride + off], p1 = arr[mod(i, n) * stride + off], p2 = arr[mod(i + 1, n) * stride + off], p3 = arr[mod(i + 2, n) * stride + off];
+  const t2 = t * t, t3 = t2 * t;
+  const v = 0.5 * (2 * p1 + (-p0 + p2) * t + (2 * p0 - 5 * p1 + 4 * p2 - p3) * t2 + (-p0 + 3 * p1 - 3 * p2 + p3) * t3);
+  return v > 0 ? v : 0;
+}
+function specAt(A, pos, bf) {
+  const b0 = Math.min(NB - 1, Math.floor(bf)), b1 = Math.min(NB - 1, b0 + 1), bt = bf - b0;
+  const v0 = cubic(A.spec, pos, A.n, NB, b0);
+  return bt === 0 ? v0 : lerp(v0, cubic(A.spec, pos, A.n, NB, b1), bt);
+}
+
+/* ---------- transport: one clock for every demo ---------- */
+const T = (() => {
+  let t0 = performance.now() / 1000, frozen = null, ctx = null, src = null, audio = false, gain = null;
+  const bufs = {};
+  const lat = () => (ctx && ctx.outputLatency) || 0.02;
+  const clockNow = () => (audio && ctx ? ctx.currentTime - lat() : performance.now() / 1000);
+  const t = () => (frozen !== null ? frozen : clockNow() - t0);
+  function startSource(name) {
+    stopSource();
+    if (!audio) return;
+    if (!bufs[name]) { const b = ctx.createBuffer(1, SR * DUR, SR); b.copyToChannel(get(name).sig, 0); bufs[name] = b; }
+    src = ctx.createBufferSource(); src.buffer = bufs[name]; src.loop = true; src.connect(gain);
+    src.start(0, mod(t(), DUR));
+  }
+  function stopSource() { if (src) { try { src.stop(); } catch (e) { /* already stopped */ } src.disconnect(); src = null; } }
+  return {
+    t,
+    get audio() { return audio; },
+    get paused() { return frozen !== null; },
+    pause(on) {
+      if (on) { frozen = t(); if (audio) this.sound(false); } else { t0 = clockNow() - frozen; frozen = null; }
+    },
+    sound(on, name) {
+      const cur = t();
+      if (on) {
+        try {
+          ctx = ctx || new (window.AudioContext || window.webkitAudioContext)();
+          if (!gain) { gain = ctx.createGain(); gain.gain.value = 0.5; gain.connect(ctx.destination); }
+          ctx.resume();
+        } catch (e) { return false; }
+        if (frozen !== null) { frozen = null; }
+        audio = true; t0 = ctx.currentTime - lat() - cur; startSource(name);
+      } else {
+        stopSource(); audio = false; t0 = performance.now() / 1000 - cur;
+      }
+      return true;
+    },
+    retarget(name) { if (audio) startSource(name); }
+  };
+})();
+
+const state = { name: 'vowels' };
+const cur = () => get(state.name);
+
+/* ---------- demo loop ---------- */
+const demos = [];
+const io = new IntersectionObserver(es => es.forEach(e => { e.target._d.visible = e.isIntersecting; }), { rootMargin: '120px' });
+function demo(id, draw) { const canvas = $(id); const d = { canvas, draw, visible: false }; canvas._d = d; demos.push(d); io.observe(canvas); return d; }
+function loop() {
+  const t = T.t();
+  for (const d of demos) if (d.visible) { try { d.draw(d.canvas, t); } catch (e) { console.error(e); } }
+  requestAnimationFrame(loop);
+}
+
+/* ---------- the orb ---------- */
+function makeDots(n) {
+  const d = { n, ux: new Float32Array(n), uy: new Float32Array(n), uz: new Float32Array(n), age: new Float32Array(n), pitch: new Float32Array(n), fx: new Float32Array(n), fy: new Float32Array(n) };
+  const golden = Math.PI * (3 - Math.sqrt(5));
+  for (let i = 0; i < n; i++) {
+    const y = 1 - 2 * (i + 0.5) / n, r = Math.sqrt(1 - y * y), a = golden * i;
+    d.ux[i] = Math.cos(a) * r; d.uy[i] = y; d.uz[i] = Math.sin(a) * r;
+    const lat = Math.asin(y), lon = Math.atan2(Math.sin(a), Math.cos(a));
+    d.age[i] = Math.abs(lat) / (Math.PI / 2); d.pitch[i] = Math.abs(lon) / Math.PI;
+    d.fx[i] = lon / Math.PI * 1.35; d.fy[i] = lat / (Math.PI / 2) * 0.95;
+  }
+  return d;
+}
+const dots = { 1800: makeDots(1800), 900: makeDots(900), 1200: makeDots(1200) };
+
+/* o: {A, t, mode: 'naive'|'loudness'|'spectrum', value, wrap, gain, history, spin, colorBy, labels} */
+function drawOrb(canvas, dd, o) {
+  const { ctx, w, h } = fit(canvas);
+  ctx.clearRect(0, 0, w, h);
+  const wrap = o.wrap === undefined ? 1 : o.wrap, gain = o.gain === undefined ? 0.5 : o.gain;
+  const H = (o.history || 0.8) * CPS;
+  const ph = o.t * CPS - 0.5 + (o.mode === 'spectrum' ? SPEC_DELAY : 0);
+  const spinA = (reduceMotion ? 0.6 : o.t * 0.12) * wrap;   // 0.12 rad/s, as in the app
+  const tip = lerp(0.55, 0.32, wrap);
+  const sy = Math.sin(spinA), cy = Math.cos(spinA), sx = Math.sin(tip), cx = Math.cos(tip);
+  const ext = lerp(1.45, 1 + gain, wrap) * 1.04;
+  const R = Math.min(w, h) / 2 / ext, k = Math.min(w, h) / 360;
+  const x0 = w / 2, y0 = h / 2;
+  const layers = [new Path2D(), new Path2D(), new Path2D(), new Path2D()];
+  const A = o.A;
+  for (let i = 0; i < dd.n; i++) {
+    let v = 0;
+    if (o.mode === 'spectrum') v = specAt(A, ph - dd.age[i] * H, dd.pitch[i] * (NB - 1));
+    else if (o.mode === 'loudness') v = cubic(A.lvl, ph - dd.age[i] * H, A.n);
+    else v = o.value;
+    const out = gain * v;
+    const ux = dd.ux[i], uy = dd.uy[i], uz = dd.uz[i];
+    const px = lerp(dd.fx[i], ux, wrap) + lerp(0, ux, wrap) * out;
+    const py = lerp(dd.fy[i], uy, wrap) + lerp(0, uy, wrap) * out;
+    const pz = lerp(0, uz, wrap) + lerp(1, uz, wrap) * out;
+    const x1 = px * cy + pz * sy, z1 = -px * sy + pz * cy;
+    const y2 = py * cx - z1 * sx, z2 = py * sx + z1 * cx;
+    const depth = clamp((z2 / (wrap > 0.5 ? 1 : 1.2) + 1) / 2, 0, 1);
+    const size = (o.mode === 'naive' ? 1.3 : 1 + 2.8 * v) * (0.75 + 0.25 * depth) * k;
+    const X = x0 + x1 * R, Y = y0 - y2 * R;
+    if (o.colorBy) {
+      const hue = o.colorBy === 'age' ? lerp(172, 275, dd.age[i]) : lerp(28, 285, dd.pitch[i]);
+      ctx.fillStyle = `hsla(${hue},85%,${o.colorBy === 'age' ? lerp(66, 60, dd.age[i]) : 62}%,${0.25 + 0.75 * depth})`;
+      ctx.beginPath(); ctx.arc(X, Y, size, 0, TAU); ctx.fill();
+    } else {
+      const layer = layers[Math.min(3, Math.floor(depth * 4))];
+      layer.moveTo(X + size, Y);
+      layer.arc(X, Y, size, 0, TAU);
+    }
+  }
+  if (!o.colorBy) {
+    const alphas = [0.18, 0.4, 0.7, 1];
+    layers.forEach((p, i) => { ctx.fillStyle = `rgba(94,234,212,${alphas[i]})`; ctx.fill(p); });
+  }
+  return { ctx, w, h };
+}
+
+/* ---------- hero ---------- */
+demo('hero', (c, t) => drawOrb(c, dots[1800], { A: cur(), t, mode: 'spectrum' }));
+
+/* ---------- naive ---------- */
+const naive = { hist: [], lastChunk: -1, value: 0 };
+demo('naiveOrb', (c, t) => {
+  const A = cur(), chunk = Math.floor(t * SR / 640);
+  if (chunk !== naive.lastChunk) {
+    naive.lastChunk = chunk;
+    let m = 0; const end = chunk * 640;
+    for (let i = end - 640; i < end; i++) m = Math.max(m, Math.abs(A.sig[mod(i, A.sig.length)]));
+    naive.value = m;
+  }
+  naive.hist.push({ t, v: naive.value }); while (naive.hist.length && naive.hist[0].t < t - 1.6) naive.hist.shift();
+  drawOrb(c, dots[900], { A, t, mode: 'naive', value: naive.value });
+});
+demo('naiveScope', (c, t) => {
+  const { ctx, w, h } = fit(c); ctx.clearRect(0, 0, w, h);
+  const A = cur(), span = 1.6, X = tt => (tt - (t - span)) / span * w, Y = v => h - 6 - v * (h - 12);
+  ctx.strokeStyle = C.faint; ctx.lineWidth = 1.2; ctx.beginPath();
+  for (let px = 0; px <= w; px += 2) { const tt = t - span + px / w * span; const k = mod(tt * CPS - 0.5, A.n); const v = Math.sqrt(A.rms[Math.floor(k)] ** 2) * 1.4; px ? ctx.lineTo(px, Y(clamp(v, 0, 1))) : ctx.moveTo(px, Y(clamp(v, 0, 1))); }
+  ctx.stroke();
+  ctx.strokeStyle = C.amber; ctx.lineWidth = 2; ctx.beginPath();
+  naive.hist.forEach((p, i) => { const x = X(p.t), y = Y(p.v); i ? ctx.lineTo(x, y) : ctx.moveTo(x, y); });
+  ctx.stroke();
+});
+
+/* ---------- finished orb and map ---------- */
+const show = { wrap: 1, byPitch: false };
+$('wrap').addEventListener('input', e => { show.wrap = +e.target.value; });
+$('byPitch').addEventListener('change', e => { show.byPitch = e.target.checked; });
+demo('showOrb', (c, t) => drawOrb(c, dots[1800], { A: cur(), t, mode: 'spectrum', wrap: show.wrap, colorBy: show.byPitch ? 'pitch' : null }));
+const mapLow = document.createElement('canvas'); mapLow.width = 120; mapLow.height = 72;
+const mapImg = mapLow.getContext('2d').createImageData(120, 72);
+function pitchX(f, w) { return Math.log(f / LO_HZ) / Math.log(HI_HZ / LO_HZ) * w; }
+function drawMap(canvas, A, t, hist) {
+  const { ctx, w, h } = fit(canvas);
+  const ph = t * CPS - 0.5 + SPEC_DELAY, H = hist * CPS, d = mapImg.data;
+  for (let yy = 0; yy < 72; yy++) {
+    const age = 1 - yy / 71;
+    for (let xx = 0; xx < 120; xx++) {
+      const v = specAt(A, ph - age * H, xx / 119 * (NB - 1)), g = Math.pow(v, 1.15), i = (yy * 120 + xx) * 4;
+      d[i] = 6 + (94 - 6) * g; d[i + 1] = 11 + (234 - 11) * g; d[i + 2] = 11 + (212 - 11) * g; d[i + 3] = 255;
+    }
+  }
+  mapLow.getContext('2d').putImageData(mapImg, 0, 0);
+  ctx.imageSmoothingEnabled = true; ctx.imageSmoothingQuality = 'high';
+  const left = 8, right = w - 8, top = 8, bottom = h - 24, mw = right - left, mh = bottom - top;
+  ctx.drawImage(mapLow, left, top, mw, mh);
+  ctx.strokeStyle = 'rgba(255,255,255,0.12)'; ctx.lineWidth = 1;
+  [100, 300, 1000, 3000].forEach(f => { const x = left + pitchX(f, mw); ctx.beginPath(); ctx.moveTo(x, top); ctx.lineTo(x, bottom); ctx.stroke(); text(ctx, f >= 1000 ? f / 1000 + 'k' : f, x, h - 8, C.dim, 10, 'center'); });
+  text(ctx, 'Hz', left + mw - 2, h - 8, C.dim, 10, 'right');
+  ctx.strokeStyle = 'rgba(255,180,84,0.6)'; ctx.beginPath(); ctx.moveTo(left, bottom - 0.5); ctx.lineTo(right, bottom - 0.5); ctx.stroke();
+  text(ctx, 'now', left + 6, bottom - 6, C.amber, 10);
+  text(ctx, hist.toFixed(1) + ' s ago', left + 6, top + 13, C.dim, 10);
+}
+demo('showMap', (c, t) => drawMap(c, cur(), t, 0.8));
+
+/* ---------- part 2: columns ---------- */
+const col = { cps: 125, sr: 44100 };
+$('colCps').addEventListener('input', e => { col.cps = +e.target.value; });
+$('colSr').addEventListener('change', e => { col.sr = +e.target.value; });
+demo('colsCanvas', (c, t) => {
+  const { ctx, w, h } = fit(c); ctx.clearRect(0, 0, w, h);
+  const A = cur(), view = 800, start = Math.floor(mod(t * SR * 0.3, A.sig.length - view - 4000)) + 2000;
+  const xs = i => (i - start) / view * w, mid = h / 2, sc = h * 0.42;
+  ctx.strokeStyle = 'rgba(255,255,255,0.08)'; ctx.beginPath(); ctx.moveTo(0, mid); ctx.lineTo(w, mid); ctx.stroke();
+  const spc = SR / col.cps;
+  let k = Math.floor(start / spc);
+  for (; ; k++) {
+    const a = Math.round(k * SR / col.cps), b = Math.round((k + 1) * SR / col.cps);
+    if (a > start + view) break;
+    let l = Infinity, hi = -Infinity, s = 0;
+    for (let i = a; i < b; i++) { const v = A.sig[mod(i, A.sig.length)]; if (v < l) l = v; if (v > hi) hi = v; s += v * v; }
+    const rms = Math.sqrt(s / (b - a)), x1 = xs(a), x2 = xs(b);
+    ctx.fillStyle = 'rgba(94,234,212,0.16)'; ctx.fillRect(x1 + 1, mid - hi * sc, x2 - x1 - 2, (hi - l) * sc);
+    ctx.strokeStyle = C.amber; ctx.lineWidth = 1.5; ctx.beginPath();
+    ctx.moveTo(x1 + 1, mid - rms * sc); ctx.lineTo(x2 - 1, mid - rms * sc); ctx.moveTo(x1 + 1, mid + rms * sc); ctx.lineTo(x2 - 1, mid + rms * sc); ctx.stroke();
+    ctx.strokeStyle = 'rgba(94,234,212,0.5)'; ctx.lineWidth = 1; ctx.beginPath(); ctx.moveTo(x1, 0); ctx.lineTo(x1, h); ctx.stroke();
+    if (x1 > 0 && x1 < w - 50) text(ctx, '' + a, x1 + 3, h - 6, C.dim, 10);
+  }
+  ctx.strokeStyle = C.fg; ctx.lineWidth = 1.2; ctx.beginPath();
+  for (let i = 0; i < view; i++) { const x = i / view * w, y = mid - A.sig[start + i] * sc; i ? ctx.lineTo(x, y) : ctx.moveTo(x, y); }
+  ctx.stroke();
+  text(ctx, 'edges at round(k · 16000 / ' + col.cps + ')', 8, 14, C.dim, 10);
+  const spc2 = col.sr / col.cps, naiveSpc = Math.floor(spc2);
+  const drift = 60 - 60 * col.cps * naiveSpc / col.sr;
+  const edges = [1, 2, 3, 4].map(k => Math.round(k * col.sr / col.cps));
+  $('colCpsOut').textContent = col.cps;
+  $('colCalc').innerHTML = `At <b>${(col.sr / 1000).toFixed(1)} kHz</b> a column is <b>${spc2.toFixed(2)}</b> samples. Exact edges: ${edges.join(', ')} …<br>Truncating to ${naiveSpc} samples makes the picture finish a minute <b class="amber">${(drift * 1000).toFixed(0)} ms</b> early.`;
+});
+
+/* ---------- part 3: flicker and ballistics ---------- */
+const tone = (() => { const x = new Float32Array(SR * DUR); for (let i = 0; i < x.length; i++) { const t = i / SR; x[i] = (0.5 + 0.3 * Math.sin(TAU * 0.6 * t)) * Math.sin(TAU * 120 * t); } return x; })();
+const flick = { ms: 4, a: null, b: null };
+function flickBuild() { const cps = 1000 / flick.ms; flick.a = columns(tone, cps, 0, 0.0001); flick.b = columns(tone, cps, 0.025, 0.0001); flick.cps = cps; }
+flickBuild();
+$('flickMs').addEventListener('input', e => { flick.ms = +e.target.value; $('flickOut').textContent = flick.ms + ' ms'; flickBuild(); });
+demo('flickCanvas', (c, t) => {
+  const { ctx, w, h } = fit(c); ctx.clearRect(0, 0, w, h);
+  const span = 1.6, Y = v => h - 18 - v / 0.8 * (h - 30);
+  ctx.strokeStyle = 'rgba(255,255,255,0.07)'; [0, 0.2, 0.4, 0.6].forEach(v => { ctx.beginPath(); ctx.moveTo(0, Y(v)); ctx.lineTo(w, Y(v)); ctx.stroke(); text(ctx, v.toFixed(1), 4, Y(v) - 3, C.dim, 9); });
+  const draw = (fn, color, lw, step) => {
+    ctx.strokeStyle = color; ctx.lineWidth = lw; ctx.beginPath();
+    for (let px = 0; px <= w; px++) { const tt = t - span + px / w * span, y = Y(fn(tt)); px ? ctx.lineTo(px, y) : ctx.moveTo(px, y); }
+    ctx.stroke();
+  };
+  draw(tt => (0.5 + 0.3 * Math.sin(TAU * 0.6 * tt)) / Math.SQRT2, C.faint, 2);
+  draw(tt => flick.a.rms[mod(Math.floor(tt * flick.cps), flick.a.n)], C.amber, 1.5);
+  draw(tt => flick.b.rms[mod(Math.floor(tt * flick.cps), flick.b.n)], C.mint, 2);
+  text(ctx, 'a 120 Hz hum, one pitch period = 8.3 ms', 8, 12, C.dim, 10);
+});
+const ball = { rel: 0.15, c: null };
+function ballBuild() { ball.c = columns(cur().sig, CPS, 0.025, ball.rel); }
+$('release').addEventListener('input', e => { ball.rel = +e.target.value; $('releaseOut').textContent = Math.round(ball.rel * 1000) + ' ms'; ballBuild(); });
+let ballFor = null;
+demo('ballCanvas', (c, t) => {
+  if (ballFor !== state.name) { ballFor = state.name; ballBuild(); }
+  const { ctx, w, h } = fit(c); ctx.clearRect(0, 0, w, h);
+  const split = w * 0.34, pad = 10, gh = h - 28;
+  // left: amplitude to height
+  const gx = a => pad + a * (split - 2 * pad), gy = v => h - 18 - v * gh;
+  ctx.strokeStyle = 'rgba(255,255,255,0.15)'; ctx.strokeRect(pad, gy(1), split - 2 * pad, gh);
+  ctx.lineWidth = 2; ctx.strokeStyle = C.amber; ctx.beginPath(); ctx.moveTo(gx(0), gy(0)); ctx.lineTo(gx(1), gy(1)); ctx.stroke();
+  ctx.strokeStyle = C.mint; ctx.beginPath();
+  for (let i = 0; i <= 100; i++) { const a = i / 100, x = gx(a), y = gy(toDisp(a, FLOOR_L)); i ? ctx.lineTo(x, y) : ctx.moveTo(x, y); }
+  ctx.stroke();
+  [0.01, 0.1].forEach(a => { const y = gy(toDisp(a, FLOOR_L)); ctx.fillStyle = C.mint; ctx.beginPath(); ctx.arc(gx(a), y, 3.5, 0, TAU); ctx.fill(); text(ctx, a + ' → ' + Math.round(toDisp(a, FLOOR_L) * 100) + '%', gx(a) + 6, y - 6, C.fg, 10); });
+  text(ctx, 'amplitude', pad, h - 4, C.dim, 10); text(ctx, 'height', pad + 2, 12, C.dim, 10);
+  // right: traces
+  const A = cur(), span = 1.6, X0 = split + 12, W = w - X0 - 6, Y = v => h - 18 - v * gh;
+  ctx.strokeStyle = 'rgba(255,255,255,0.15)'; ctx.strokeRect(X0, Y(1), W, gh);
+  const tr = (arr, color, lw) => { ctx.strokeStyle = color; ctx.lineWidth = lw; ctx.beginPath(); for (let px = 0; px <= W; px++) { const tt = t - span + px / W * span, v = toDisp(arr[mod(Math.floor(tt * CPS), ball.c.n)], FLOOR_L), y = Y(v); px ? ctx.lineTo(X0 + px, y) : ctx.moveTo(X0 + px, y); } ctx.stroke(); };
+  tr(ball.c.rms, '#4d6a64', 1.2); tr(ball.c.level, C.mint, 2.2);
+  text(ctx, 'time', X0, h - 4, C.dim, 10);
+});
+
+/* ---------- part 4: time on a sphere ---------- */
+const tm = { hist: 0.8, byAge: true };
+$('hist').addEventListener('input', e => { tm.hist = +e.target.value; $('histOut').textContent = tm.hist.toFixed(2) + ' s'; });
+$('byAge').addEventListener('change', e => { tm.byAge = e.target.checked; });
+demo('timeOrb', (c, t) => drawOrb(c, dots[900], { A: cur(), t, mode: 'loudness', history: tm.hist, colorBy: tm.byAge ? 'age' : null }));
+
+/* ---------- part 5: playhead ---------- */
+const sm = { cps: 40, mode: 'cubic', jit: true, pll: true, hist: [], phase: NaN, period: 1 / 60, Lkey: '', L: null, rnd: rng(11) };
+document.querySelectorAll('input[name=rd]').forEach(r => r.addEventListener('change', e => { sm.mode = e.target.value; }));
+$('smCps').addEventListener('input', e => { sm.cps = +e.target.value; $('smCpsOut').textContent = sm.cps; });
+$('smJit').addEventListener('change', e => { sm.jit = e.target.checked; });
+$('smPll').addEventListener('change', e => { sm.pll = e.target.checked; });
+function pllTick(m) {
+  if (isNaN(sm.phase) || m - sm.phase >= 0.5 || m < sm.phase - 0.5) { sm.phase = m; return m; }
+  const predicted = sm.phase + sm.period, err = Math.max(-sm.period, Math.min(2 * sm.period, m - predicted));
+  sm.period += 0.01 * err; sm.phase = predicted + 0.15 * err; return sm.phase;
+}
+demo('smoothCanvas', (c, t) => {
+  const A = cur(), key = A.name + sm.cps;
+  if (sm.Lkey !== key) { sm.Lkey = key; const cc = columns(A.sig, sm.cps, 0.025, 0.15); sm.L = { n: cc.n, d: Float32Array.from(cc.level, v => toDisp(v, FLOOR_L)) }; }
+  const L = sm.L, cps = sm.cps, latency = 0.06;
+  let v;
+  if (!T.paused) {
+    const m = t + (sm.jit ? (sm.rnd() - 0.5) * 0.008 : 0), ph = sm.pll ? pllTick(m) : m;
+    if (sm.mode === 'latest') {
+      const tb = Math.floor((t - 0.004 * sm.rnd()) / 0.0107) * 0.0107;
+      v = L.d[mod(Math.floor(tb * cps) - 1, L.n)];
+    } else {
+      const pos = (ph - latency) * cps - 0.5;
+      if (sm.mode === 'nearest') v = L.d[mod(Math.round(pos), L.n)];
+      else if (sm.mode === 'linear') { const i = Math.floor(pos); v = lerp(L.d[mod(i, L.n)], L.d[mod(i + 1, L.n)], pos - i); }
+      else v = cubic(L.d, pos, L.n);
+    }
+    const truth = cubic(A.lvl, (t - (sm.mode === 'latest' ? 0 : latency)) * CPS - 0.5, A.n);
+    sm.hist.push({ t, v, truth });
+  }
+  const span = 0.7; while (sm.hist.length && sm.hist[0].t < t - span) sm.hist.shift();
+  const { ctx, w, h } = fit(c); ctx.clearRect(0, 0, w, h);
+  const X = tt => (tt - (t - span)) / span * w, Y = val => h - 14 - val * (h - 28);
+  ctx.strokeStyle = 'rgba(255,255,255,0.07)'; for (let q = 0; q <= 1; q += 0.25) { ctx.beginPath(); ctx.moveTo(0, Y(q)); ctx.lineTo(w, Y(q)); ctx.stroke(); }
+  ctx.strokeStyle = C.faint; ctx.lineWidth = 3; ctx.beginPath(); sm.hist.forEach((p, i) => { i ? ctx.lineTo(X(p.t), Y(p.truth)) : ctx.moveTo(X(p.t), Y(p.truth)); }); ctx.stroke();
+  ctx.strokeStyle = C.mint; ctx.lineWidth = 1.6; ctx.beginPath(); sm.hist.forEach((p, i) => { i ? ctx.lineTo(X(p.t), Y(p.v)) : ctx.moveTo(X(p.t), Y(p.v)); }); ctx.stroke();
+  ctx.fillStyle = C.mint; sm.hist.forEach(p => { ctx.beginPath(); ctx.arc(X(p.t), Y(p.v), 1.8, 0, TAU); ctx.fill(); });
+  const hs = sm.hist, n = hs.length;
+  if (n > 8) { let s = 0; for (let i = 2; i < n; i++) { const d2 = hs[i].v - 2 * hs[i - 1].v + hs[i - 2].v; s += d2 * d2; } $('smRough').innerHTML = `roughness <b>${(Math.sqrt(s / (n - 2)) * 100).toFixed(2)}</b> (lower is smoother). Each dot is one screen frame.`; }
+});
+
+/* ---------- part 6: spectrum ---------- */
+const fx = { hann: true, tilt: 3, nb: 24, out: new Float64Array(48) };
+$('useHann').addEventListener('change', e => { fx.hann = e.target.checked; });
+$('tilt').addEventListener('input', e => { fx.tilt = +e.target.value; $('tiltOut').textContent = fx.tilt + ' dB/oct'; });
+$('nbands').addEventListener('input', e => { fx.nb = +e.target.value; $('nbandsOut').textContent = fx.nb; });
+$('checkNorm').addEventListener('click', () => {
+  const A = 0.5, x = new Float32Array(4096); for (let i = 0; i < x.length; i++) x[i] = A * Math.sin(TAU * 1000 * i / SR);
+  const out = new Float64Array(24); analyseFrame(x, 2048, { hann: true, tilt: 0, nb: 24 }, out);
+  let ms = 0, mx = 0; out.forEach(v => { ms += v * v; mx = Math.max(mx, v); });
+  $('normOut').innerHTML = `Sine, amplitude 0.5, 1 kHz, tilt 0.<br>Loudest band: <b>${mx.toFixed(3)}</b> (A/√2 = ${(A / Math.SQRT2).toFixed(3)}). Bands' squares add to <b>${ms.toFixed(4)}</b> (mean square = ${(A * A / 2).toFixed(4)}).`;
+});
+demo('fftCanvas', (c, t) => {
+  const A = cur(), { ctx, w, h } = fit(c); ctx.clearRect(0, 0, w, h);
+  const end = Math.floor(t * SR), topH = h * 0.36, mid = topH / 2 + 4, sc = topH * 0.42;
+  ctx.strokeStyle = 'rgba(255,255,255,0.08)'; ctx.beginPath(); ctx.moveTo(0, mid); ctx.lineTo(w, mid); ctx.stroke();
+  const line = (fn, color, lw) => { ctx.strokeStyle = color; ctx.lineWidth = lw; ctx.beginPath(); for (let px = 0; px < w; px++) { const n = Math.floor(px / w * FFT_N), y = mid - fn(n) * sc; px ? ctx.lineTo(px, y) : ctx.moveTo(px, y); } ctx.stroke(); };
+  const s = n => A.sig[mod(end - FFT_N + n, A.sig.length)];
+  line(s, 'rgba(214,229,224,0.3)', 1);
+  if (fx.hann) line(n => s(n) * hann[n], C.mint, 1.4);
+  text(ctx, 'the last 64 ms' + (fx.hann ? ', through a Hann window' : ', cut off square'), 8, 13, C.dim, 10);
+  const v = analyseFrame(A.sig, end, fx, fx.out), nb = fx.nb, { centre, edgesHz } = bandsFor(nb);
+  const base = h - 22, ph = base - topH - 16, bw = w / nb;
+  ctx.strokeStyle = 'rgba(255,255,255,0.07)'; for (let q = 0; q <= 1; q += 0.25) { ctx.beginPath(); ctx.moveTo(0, base - q * ph); ctx.lineTo(w, base - q * ph); ctx.stroke(); }
+  for (let b = 0; b < nb; b++) {
+    const d = toDisp(v[b], FLOOR_S), bh = d * ph;
+    ctx.fillStyle = `rgba(94,234,212,${0.35 + 0.65 * d})`; ctx.fillRect(b * bw + 1.5, base - bh, bw - 3, bh);
+  }
+  [100, 300, 1000, 3000].forEach(f => { const b = Math.log(f / LO_HZ) / Math.log(HI_HZ / LO_HZ) * nb, x = b * bw; text(ctx, f >= 1000 ? f / 1000 + 'k' : f, x, h - 6, C.dim, 10, 'center'); });
+  text(ctx, 'Hz, log scale: every band the same musical width', w - 6, h - 6, C.dim, 10, 'right');
+});
+
+/* ---------- part 7: ring ---------- */
+const rg = { cap: 16, w: 0, nextW: 0, burst: 0, phase: 'idle', end: 0, real: 0, p: 0, since: 0, msg: 'idle', clean: 0, retries: 0, last: 0 };
+$('lap').addEventListener('click', () => { rg.burst = 20; });
+demo('ringCanvas', (c, t) => {
+  const dt = Math.min(0.1, Math.max(0, t - rg.last)); rg.last = t;
+  if (T.paused) { /* frozen */ } else {
+    rg.nextW -= dt;
+    while (rg.nextW <= 0) { rg.w++; rg.nextW += rg.burst > 0 ? 0.05 : 0.32; if (rg.burst > 0) rg.burst--; }
+    if (rg.phase === 'idle') { rg.since += dt; if (rg.since > 1.6) { rg.phase = 'copy'; rg.end = rg.w; rg.real = Math.min(8, rg.end); rg.p = 0; rg.msg = `acquire load: written = ${rg.end}`; } }
+    else if (rg.phase === 'copy') {
+      rg.p += dt / 1.5;
+      if (rg.p >= 1) {
+        const torn = rg.w - (rg.end - rg.real) > rg.cap;
+        if (torn) { rg.retries++; rg.msg = `written is now ${rg.w}: the writer lapped the copy, so copy again`; rg.phase = 'torn'; rg.since = 0; }
+        else { rg.clean++; rg.msg = `written is ${rg.w}: copy is whole, return it`; rg.phase = 'done'; rg.since = 0; }
+      }
+    } else { rg.since += dt; if (rg.since > 0.9) { rg.phase = rg.phase === 'torn' ? 'copy' : 'idle'; rg.since = 0; if (rg.phase === 'copy') { rg.end = rg.w; rg.real = Math.min(8, rg.end); rg.p = 0; rg.msg = `acquire load: written = ${rg.end}`; } } }
+  }
+  const { ctx, w, h } = fit(c); ctx.clearRect(0, 0, w, h);
+  const cx = w / 2, cy = h / 2 - 4, R = Math.min(w, h) * 0.36, r0 = R * 0.62, N = rg.cap;
+  const ang = i => -Math.PI / 2 + (i + 0.5) / N * TAU;
+  for (let i = 0; i < N; i++) {
+    // newest write count that landed in slot i
+    const latest = rg.w - 1 - mod(rg.w - 1 - i, N);
+    const a0 = ang(i) - TAU / N / 2 + 0.02, a1 = ang(i) + TAU / N / 2 - 0.02;
+    let inCopy = false;
+    if (rg.phase === 'copy' || rg.phase === 'torn' || rg.phase === 'done') {
+      for (let j = 0; j < rg.real; j++) if (mod(rg.end - rg.real + j, N) === i && (rg.phase !== 'copy' || j < rg.p * rg.real)) inCopy = true;
+    }
+    ctx.beginPath(); ctx.arc(cx, cy, R, a0, a1); ctx.arc(cx, cy, r0, a1, a0, true); ctx.closePath();
+    ctx.fillStyle = latest < 0 ? '#0c1b19' : inCopy ? (rg.phase === 'torn' ? 'rgba(251,113,133,0.75)' : 'rgba(94,234,212,0.85)') : 'rgba(94,234,212,0.18)';
+    ctx.fill();
+    if (latest >= 0) { const m = (R + r0) / 2; text(ctx, '' + latest, cx + Math.cos(ang(i)) * m, cy + Math.sin(ang(i)) * m + 3, inCopy ? '#04201c' : C.dim, 10, 'center'); }
+  }
+  const wa = ang(mod(rg.w, N));
+  ctx.strokeStyle = C.amber; ctx.lineWidth = 2; ctx.beginPath(); ctx.moveTo(cx + Math.cos(wa) * (r0 - 4), cy + Math.sin(wa) * (r0 - 4)); ctx.lineTo(cx + Math.cos(wa) * (R + 10), cy + Math.sin(wa) * (R + 10)); ctx.stroke();
+  text(ctx, 'next write', cx + Math.cos(wa) * (R + 14), cy + Math.sin(wa) * (R + 14), C.amber, 10, Math.cos(wa) > 0 ? 'left' : 'right');
+  text(ctx, 'audio thread', cx, cy - 6, C.amber, 11, 'center'); text(ctx, 'writes, then publishes', cx, cy + 9, C.dim, 10, 'center');
+  text(ctx, 'screen thread copies the newest 8', cx, cy + 24, C.mint, 10, 'center');
+  $('ringOut').innerHTML = `slots: <b>${N}</b> (a power of two) · written: <b>${rg.w}</b> · clean copies: <b>${rg.clean}</b> · retries: <b class="amber">${rg.retries}</b><br>${rg.msg}`;
+});
+
+/* ---------- controls ---------- */
+const chips = $('chips');
+ORDER.forEach(n => { const b = document.createElement('button'); b.textContent = SIGNALS[n].label; b.dataset.n = n; b.setAttribute('aria-pressed', n === state.name); chips.appendChild(b); });
+function setSignal(n) {
+  state.name = n; get(n);
+  chips.querySelectorAll('button').forEach(b => b.setAttribute('aria-pressed', b.dataset.n === n));
+  $('look').innerHTML = SIGNALS[n].look;
+  naive.hist.length = 0; sm.hist.length = 0;
+  T.retarget(n);
+}
+chips.addEventListener('click', e => { const b = e.target.closest('button'); if (b) setSignal(b.dataset.n); });
+$('snd').addEventListener('click', e => {
+  const on = !T.audio;
+  if (on && T.paused) { T.pause(false); $('pause').setAttribute('aria-pressed', 'false'); $('pause').textContent = 'Pause'; }
+  const ok = T.sound(on, state.name);
+  const btn = e.currentTarget;
+  btn.setAttribute('aria-pressed', ok && on); btn.textContent = ok ? (on ? 'Sound on' : 'Sound off') : 'No audio here';
+});
+$('pause').addEventListener('click', e => {
+  const on = !T.paused; T.pause(on);
+  e.currentTarget.setAttribute('aria-pressed', on); e.currentTarget.textContent = on ? 'Resume' : 'Pause';
+  const s = $('snd'); s.setAttribute('aria-pressed', T.audio); s.textContent = T.audio ? 'Sound on' : 'Sound off';
+});
+
+/* tiny syntax colouring for the code blocks */
+document.querySelectorAll('pre.code code').forEach(el => {
+  const esc = el.innerHTML;
+  el.innerHTML = esc.split('\n').map(line => {
+    const i = line.indexOf('//');
+    const code = i >= 0 ? line.slice(0, i) : line, com = i >= 0 ? `<span class="c">${line.slice(i)}</span>` : '';
+    return code.replace(/\b(let|var|func|static|for|in|while|true|return|if)\b/g, '<span class="k">$1</span>') + com;
+  }).join('\n');
+});
+
+/* start */
+get('vowels');
+setSignal('vowels');
+$('colCpsOut').textContent = col.cps;
+requestAnimationFrame(loop);
+setTimeout(() => ORDER.forEach(n => get(n)), 300);
+})();
+</script>
