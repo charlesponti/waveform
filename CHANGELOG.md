@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.1.1
+
+- `OrbView` and `SpectrumOrbView` take a `tint` colour (default mint, as before).
+
 ## 0.1.0
 
 First release.

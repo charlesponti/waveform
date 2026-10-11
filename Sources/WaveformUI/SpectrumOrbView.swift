@@ -17,6 +17,7 @@ public struct SpectrumOrbView: View {
   var historySeconds: Double
   var showStats: Bool
   var turning: Bool
+  var tint: Color
   @State private var scratch = Scratch()
   @State private var model: OrbModel
 
@@ -30,7 +31,7 @@ public struct SpectrumOrbView: View {
     spectrum: SpectrumRing, columnsPerSecond: Double = 120, sampleRate: Double = 48_000,
     fftSize: Int = 2_048, clock: StreamClock? = nil, latency: Double = 0.06,
     scale: Scale = .decibels(floor: -66), gain: Float = 0.5, historySeconds: Double = 0.8,
-    showStats: Bool = true, turning: Bool = true, dotCount: Int = 1_800
+    showStats: Bool = true, turning: Bool = true, tint: Color = .mint, dotCount: Int = 1_800
   ) {
     self.spectrum = spectrum
     self.columnsPerSecond = columnsPerSecond
@@ -43,6 +44,7 @@ public struct SpectrumOrbView: View {
     self.historySeconds = historySeconds
     self.showStats = showStats
     self.turning = turning
+    self.tint = tint
     _model = State(initialValue: OrbModel(count: dotCount))
   }
 
@@ -70,7 +72,7 @@ public struct SpectrumOrbView: View {
     let playhead = min(Double(end - 2), columnPlayhead + delay)
     let projection = OrbProjection(
       spin: OrbProjection.spin(turning: turning, time: frameTime, rate: 0.12, still: 0), tip: 0.32)
-    drawOrbDots(&context, size: size, model: model, projection: projection, gain: gain) { i in
+    drawOrbDots(&context, size: size, model: model, projection: projection, gain: gain, tint: tint) { i in
       let level = window.value(
         time: playhead - Double(model.age[i]) * history, band: model.pitch[i] * Float(bands - 1),
         scale: scale)

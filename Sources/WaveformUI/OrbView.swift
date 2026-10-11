@@ -14,6 +14,7 @@ public struct OrbView: View {
   var historySeconds: Double
   var showStats: Bool
   var turning: Bool
+  var tint: Color
   @State private var scratch = Scratch()
   @State private var model: OrbModel
 
@@ -24,11 +25,12 @@ public struct OrbView: View {
   ///   - gain: how far a full-scale sound pushes a dot out, as a fraction of the radius.
   ///   - historySeconds: how much of the past the orb spans, equator to pole.
   ///   - turning: spin steadily; off holds a fixed angle.
+  ///   - tint: the colour of the dots.
   ///   - dotCount: number of dots on the sphere.
   public init(
     ring: ColumnRing, columnsPerSecond: Double = 120, clock: StreamClock? = nil, latency: Double = 0.06,
     scale: Scale = .decibels(floor: -60), gain: Float = 0.45, historySeconds: Double = 0.8,
-    showStats: Bool = true, turning: Bool = true, dotCount: Int = 1_400
+    showStats: Bool = true, turning: Bool = true, tint: Color = .mint, dotCount: Int = 1_400
   ) {
     self.ring = ring
     self.columnsPerSecond = columnsPerSecond
@@ -39,6 +41,7 @@ public struct OrbView: View {
     self.historySeconds = historySeconds
     self.showStats = showStats
     self.turning = turning
+    self.tint = tint
     _model = State(initialValue: OrbModel(count: dotCount))
   }
 
@@ -62,7 +65,7 @@ public struct OrbView: View {
       .position(hostSeconds: frameTime, clock: clock ?? StreamClock(), written: end)
     let projection = OrbProjection(
       spin: OrbProjection.spin(turning: turning, time: frameTime, rate: 0.35, still: 0.6), tip: 0.35)
-    drawOrbDots(&context, size: size, model: model, projection: projection, gain: gain) { i in
+    drawOrbDots(&context, size: size, model: model, projection: projection, gain: gain, tint: tint) { i in
       let (out, peak) = OrbModel.sample(
         age: model.age[i], window: window, playhead: playhead, history: history, scale: scale,
         gain: gain)
