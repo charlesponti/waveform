@@ -10,10 +10,13 @@ let package = Package(
   products: [
     .library(name: "WaveformCore", targets: ["WaveformCore"]),
     .library(name: "WaveformUI", targets: ["WaveformUI"]),
+    // Recording: one engine, two sets of settings (Thames streams speech, Ponte transcribes it).
+    .library(name: "WaveformCapture", targets: ["WaveformCapture"]),
   ],
   targets: [
     .target(name: "WaveformCore"),
     .target(name: "WaveformUI", dependencies: ["WaveformCore"]),
+    .target(name: "WaveformCapture", dependencies: ["WaveformCore"]),
     .executableTarget(
       name: "WaveformApp", dependencies: ["WaveformCore", "WaveformUI"], exclude: ["Info.plist"],
       // The microphone needs a usage description; a command-line build has no Info.plist, so one is
@@ -26,5 +29,6 @@ let package = Package(
       ]),
     .testTarget(name: "WaveformCoreTests", dependencies: ["WaveformCore"]),
     .testTarget(name: "WaveformUITests", dependencies: ["WaveformUI", "WaveformCore"]),
+    .testTarget(name: "WaveformCaptureTests", dependencies: ["WaveformCapture", "WaveformCore"]),
   ]
 )
