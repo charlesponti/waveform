@@ -19,7 +19,7 @@ for bundle in .build/debug/*.xctest; do
 done
 OBJECTS=()
 for b in "${BINS[@]:1}"; do OBJECTS+=(-object "$b"); done
-IGNORE='(Tests|\.build|WaveformApp|SystemMicrophone)'
+IGNORE='(Tests|\.build|WaveformApp|SystemMicrophone|WaveformCapture)'
 
 xcrun llvm-cov report "${BINS[0]}" ${OBJECTS[@]+"${OBJECTS[@]}"} -instr-profile "$PROFDATA" -ignore-filename-regex="$IGNORE"
 
