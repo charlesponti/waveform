@@ -56,8 +56,10 @@ struct DotLayers {
       in: CGRect(x: center.x - radius, y: center.y - radius, width: radius * 2, height: radius * 2))
   }
 
-  func fill(in context: inout GraphicsContext, color: Color) {
-    for (path, opacity) in zip(paths, OrbProjection.opacities) {
+  func fill(
+    in context: inout GraphicsContext, color: Color, opacities: [Double] = OrbProjection.opacities
+  ) {
+    for (path, opacity) in zip(paths, opacities) {
       context.fill(path, with: .color(color.opacity(opacity)))
     }
   }
@@ -67,7 +69,8 @@ struct DotLayers {
 /// and how large it is before perspective (`base`).
 func drawOrbDots(
   _ context: inout GraphicsContext, size: CGSize, model: OrbModel, projection: OrbProjection,
-  gain: Float, tint: Color, value: (Int) -> (out: Float, base: Float)
+  gain: Float, tint: Color, opacities: [Double] = OrbProjection.opacities,
+  value: (Int) -> (out: Float, base: Float)
 ) {
   let radius = OrbProjection.radius(in: size, gain: gain)
   let center = SIMD2<Float>(Float(size.width) / 2, Float(size.height) / 2)
@@ -80,5 +83,5 @@ func drawOrbDots(
       center: CGPoint(x: CGFloat(center.x + p.x * radius), y: CGFloat(center.y - p.y * radius)),
       radius: CGFloat(dot), layer: OrbProjection.layer(depth: p.depth))
   }
-  layers.fill(in: &context, color: tint)
+  layers.fill(in: &context, color: tint, opacities: opacities)
 }

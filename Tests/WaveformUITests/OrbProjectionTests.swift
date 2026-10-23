@@ -85,4 +85,16 @@ import simd
     #expect(layers.paths[2].boundingRect == CGRect(x: 8, y: 8, width: 4, height: 4))
     #expect(layers.paths[0].isEmpty && layers.paths[1].isEmpty && layers.paths[3].isEmpty)
   }
+
+  @Test func theDefaultStyleIsTheOriginalLook() {
+    let style = OrbStyle()
+    #expect(style.dotBase == 1 && style.dotGrowth == 2.8 && style.contrast == 1)
+    #expect(style.opacities == OrbProjection.opacities && style.spinRate == 0.12 && style.tip == 0.32)
+  }
+
+  @Test func contrastKeepsQuietPitchesStillAndLeavesTheEndsAlone() {
+    let sharp = OrbStyle(contrast: 2)
+    #expect(sharp.shaped(0.5) == 0.25 && sharp.shaped(1) == 1 && sharp.shaped(0) == 0)
+    #expect(OrbStyle().shaped(0.5) == 0.5)
+  }
 }

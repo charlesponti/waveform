@@ -1,0 +1,516 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="claude:viewport-fit-sides" content="cover">
+<title>Orb Lab</title>
+<style>
+/* Layout: two live orbs (Waveform today, your working copy) over a spectrogram strip; every parameter in a rail on the right. */
+:root {
+  --bg: #0a1210;
+  --panel: #101b18;
+  --raise: #15231f;
+  --line: #213630;
+  --fg: #dbe9e4;
+  --muted: #7f968e;
+  --accent: #8ff0d0;
+  --changed: #f0c674;
+  --f-ui: system-ui, -apple-system, "Segoe UI", sans-serif;
+  --f-num: ui-monospace, "SF Mono", Menlo, Consolas, monospace;
+  color-scheme: dark;
+}
+* { box-sizing: border-box; }
+body {
+  background: var(--bg); color: var(--fg); font: 14px/1.45 var(--f-ui);
+  padding-left: max(16px, env(safe-area-inset-left, 0px));
+  padding-right: max(16px, env(safe-area-inset-right, 0px));
+  padding-block: 18px 40px;
+}
+h1 { font-size: 22px; font-weight: 600; margin: 0; letter-spacing: -0.01em; }
+h2 { font-size: 11px; font-weight: 600; margin: 0; letter-spacing: 0.09em; text-transform: uppercase; color: var(--muted); }
+p { margin: 0; }
+.sub { color: var(--muted); max-width: 70ch; margin-top: 4px; text-wrap: pretty; }
+header { display: flex; flex-wrap: wrap; gap: 12px 24px; align-items: end; justify-content: space-between; margin-bottom: 16px; }
+.layout { display: grid; grid-template-columns: minmax(0, 1fr) 340px; gap: 20px; align-items: start; }
+@media (max-width: 900px) { .layout { grid-template-columns: minmax(0, 1fr); } }
+.stack { display: flex; flex-direction: column; gap: 14px; min-width: 0; }
+.card { background: var(--panel); border: 1px solid var(--line); border-radius: 14px; padding: 14px; min-width: 0; }
+.bar { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; }
+button, select {
+  font: inherit; color: var(--fg); background: var(--raise); border: 1px solid var(--line);
+  border-radius: 999px; padding: 7px 14px; cursor: pointer; min-height: 36px;
+}
+button:hover, select:hover { border-color: var(--muted); }
+button:focus-visible, select:focus-visible, input:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+button[aria-pressed="true"] { background: color-mix(in srgb, var(--accent) 18%, var(--raise)); border-color: var(--accent); color: var(--accent); }
+.status { color: var(--muted); font-size: 12px; margin-left: auto; }
+.orbs { display: grid; grid-template-columns: repeat(auto-fit, minmax(260px, 1fr)); gap: 14px; }
+.orbcell { display: flex; flex-direction: column; align-items: center; gap: 8px; min-width: 0; }
+.orbcell canvas { display: block; background: transparent; max-width: 100%; }
+.cap { font-size: 12px; color: var(--muted); }
+.cap b { color: var(--fg); font-weight: 600; }
+canvas.wide { width: 100%; display: block; border-radius: 8px; background: #070d0b; }
+.scrub { display: flex; gap: 10px; align-items: center; margin-top: 10px; }
+.scrub input { flex: 1; }
+.num { font-family: var(--f-num); font-variant-numeric: tabular-nums; font-size: 12px; color: var(--muted); }
+.rail { position: sticky; top: 12px; max-height: calc(100vh - 24px); overflow-y: auto; padding: 0; }
+@media (max-width: 900px) { .rail { position: static; max-height: none; } }
+.group { padding: 14px; border-bottom: 1px solid var(--line); }
+.group:last-child { border-bottom: 0; }
+.gnote { color: var(--muted); font-size: 12px; margin: 4px 0 10px; text-wrap: pretty; }
+.row { display: grid; grid-template-columns: 1fr auto; gap: 2px 10px; align-items: center; margin-bottom: 9px; }
+.row label { font-size: 13px; cursor: default; display: flex; gap: 6px; align-items: center; }
+.row output { font-family: var(--f-num); font-variant-numeric: tabular-nums; font-size: 12px; color: var(--muted); }
+.row input[type=range] { grid-column: 1 / -1; width: 100%; accent-color: var(--accent); margin: 0; }
+.row.changed label, .row.changed output { color: var(--changed); }
+.tag { font-size: 10px; letter-spacing: 0.06em; text-transform: uppercase; border: 1px solid var(--line); color: var(--muted); border-radius: 4px; padding: 0 4px; }
+.row input[type=color] { width: 44px; height: 28px; border: 1px solid var(--line); border-radius: 6px; background: var(--raise); padding: 2px; }
+.row select { grid-column: 1 / -1; width: 100%; border-radius: 8px; }
+pre { margin: 8px 0 0; padding: 10px; background: #070d0b; border: 1px solid var(--line); border-radius: 8px; font: 12px/1.5 var(--f-num); color: var(--fg); overflow-x: auto; white-space: pre; }
+.hint { font-size: 12px; color: var(--muted); }
+</style>
+</head>
+<body>
+<header>
+  <div>
+    <h1>Orb Lab</h1>
+    <p class="sub">Waveform's orb, ported line for line: the same spectrum, window, dot placement and sizing. The left orb is Waveform as it ships. The right one is yours to change. Double-click a label to reset it. Part of <a href="https://github.com/charlesponti/waveform-ios" style="color:var(--accent)">waveform-ios</a>.</p>
+  </div>
+</header>
+
+<div class="layout">
+  <div class="stack">
+    <section class="card">
+      <div class="bar" id="sources">
+        <button id="srcDemo" aria-pressed="true">Voice demo</button>
+        <button id="srcFile">Open file…</button>
+        <button id="srcMic" aria-pressed="false">Microphone</button>
+        <input id="fileIn" type="file" accept="audio/*" hidden>
+        <span class="status" id="status">Loading demo voice…</span>
+      </div>
+      <div class="scrub" id="transport">
+        <button id="playBtn" aria-label="Play or pause">Play</button>
+        <input id="scrub" type="range" min="0" max="1" step="0.001" value="0" aria-label="Position">
+        <span class="num" id="clock">0.0 / 0.0 s</span>
+      </div>
+    </section>
+
+    <section class="card">
+      <div class="orbs">
+        <div class="orbcell"><canvas id="orbA"></canvas><div class="cap"><b>Waveform today</b> · locked</div></div>
+        <div class="orbcell"><canvas id="orbB"></canvas><div class="cap"><b>Working copy</b> · yours</div></div>
+      </div>
+    </section>
+
+    <section class="card">
+      <h2>What the orb is reading</h2>
+      <p class="hint" style="margin:4px 0 8px">Spectrogram of the working copy: time left to right, low pitch at the bottom. The bracket is the stretch of history the dots look back over; the newest sound is at its right edge.</p>
+      <canvas class="wide" id="strip" height="150"></canvas>
+    </section>
+
+    <section class="card">
+      <h2>How loud turns into dots</h2>
+      <p class="hint" style="margin:4px 0 8px">Loudness at one pitch (left to right) against how far a dot pushes out and how big it grows. Faint lines are Waveform today.</p>
+      <canvas class="wide" id="curve" height="150"></canvas>
+    </section>
+  </div>
+
+  <aside class="card rail" id="rail" aria-label="Parameters">
+    <div class="group">
+      <h2>Presets</h2>
+      <div class="bar" style="margin-top:8px" id="presets"></div>
+    </div>
+  </aside>
+</div>
+
+<script>
+'use strict';
+/* ---------- constants, as in Waveform and Thames ---------- */
+const CPS = 120; // columns per second
+const DEFAULTS = {
+  bands: 24, lowHz: 80, highHz: 8000, tilt: 3, fft: 2048,
+  floorDb: -66, history: 0.8, gain: 0.5, dotBase: 1.0, dotGain: 2.8,
+  gamma: 1, gate: 0, ageFalloff: 0, pitchCurve: 1,
+  dots: 900, perspective: 0.25, op0: 0.18, op1: 0.4, op2: 0.7, op3: 1.0, hot: 0,
+  spin: 0.12, tip: 0.32,
+  latency: 0.06, lead: 0.25, sync: 0,
+  tint: '#9ff0d8', size: 190, zoom: 1.7,
+};
+const GROUPS = [
+  { title: 'Spectrum', note: 'What the orb hears. Changing these rebuilds the numbers from the audio (SpectrumBuilder).', items: [
+    { k: 'bands', label: 'Pitch bands', min: 8, max: 48, step: 1 },
+    { k: 'lowHz', label: 'Lowest pitch (Hz)', min: 40, max: 400, step: 5 },
+    { k: 'highHz', label: 'Highest pitch (Hz)', min: 2000, max: 11000, step: 100 },
+    { k: 'tilt', label: 'Tilt (dB per octave)', min: 0, max: 9, step: 0.5, fmt: v => v.toFixed(1) },
+    { k: 'fft', label: 'Window (samples)', choices: [512, 1024, 2048, 4096] },
+  ]},
+  { title: 'Response', note: 'How a loudness becomes a dot. The four tagged "new" are not in the package yet.', items: [
+    { k: 'floorDb', label: 'Quiet floor (dB)', min: -90, max: -20, step: 1 },
+    { k: 'history', label: 'History (s)', min: 0.2, max: 2, step: 0.05, fmt: v => v.toFixed(2) },
+    { k: 'gain', label: 'Push out', min: 0, max: 1.5, step: 0.01, fmt: v => v.toFixed(2) },
+    { k: 'dotBase', label: 'Dot size at rest', min: 0.4, max: 3, step: 0.05, fmt: v => v.toFixed(2) },
+    { k: 'dotGain', label: 'Dot growth with sound', min: 0, max: 8, step: 0.1, fmt: v => v.toFixed(1) },
+    { k: 'gamma', label: 'Contrast curve', min: 0.4, max: 3, step: 0.05, fmt: v => v.toFixed(2) },
+    { k: 'gate', label: 'Noise gate', min: 0, max: 0.6, step: 0.01, fmt: v => v.toFixed(2), isNew: true },
+    { k: 'ageFalloff', label: 'Fade with age', min: 0, max: 1, step: 0.01, fmt: v => v.toFixed(2), isNew: true },
+    { k: 'pitchCurve', label: 'Pitch spread', min: 0.5, max: 2, step: 0.05, fmt: v => v.toFixed(2), isNew: true },
+  ]},
+  { title: 'Dots', note: 'Count and how they read in depth.', items: [
+    { k: 'dots', label: 'Dot count', min: 200, max: 2400, step: 50 },
+    { k: 'perspective', label: 'Depth shrink', min: 0, max: 0.6, step: 0.01, fmt: v => v.toFixed(2) },
+    { k: 'op0', label: 'Far layer opacity', min: 0, max: 1, step: 0.01, fmt: v => v.toFixed(2) },
+    { k: 'op1', label: 'Back layer opacity', min: 0, max: 1, step: 0.01, fmt: v => v.toFixed(2) },
+    { k: 'op2', label: 'Front layer opacity', min: 0, max: 1, step: 0.01, fmt: v => v.toFixed(2) },
+    { k: 'op3', label: 'Nearest layer opacity', min: 0, max: 1, step: 0.01, fmt: v => v.toFixed(2) },
+    { k: 'hot', label: 'Loud dots brighten', min: 0, max: 1, step: 0.01, fmt: v => v.toFixed(2), isNew: true },
+  ]},
+  { title: 'Motion', note: '', items: [
+    { k: 'spin', label: 'Turn speed (rad/s)', min: 0, max: 0.6, step: 0.01, fmt: v => v.toFixed(2) },
+    { k: 'tip', label: 'Tilt (rad)', min: 0, max: 0.8, step: 0.01, fmt: v => v.toFixed(2) },
+  ]},
+  { title: 'Timing', note: 'How the picture lines up with the sound.', items: [
+    { k: 'latency', label: 'Picture lag (s)', min: 0, max: 0.2, step: 0.005, fmt: v => v.toFixed(3) },
+    { k: 'lead', label: 'Data ahead of playhead (s)', min: 0.05, max: 0.6, step: 0.01, fmt: v => v.toFixed(2) },
+    { k: 'sync', label: 'Browser audio offset (s)', min: -0.2, max: 0.2, step: 0.005, fmt: v => v.toFixed(3), labOnly: true },
+  ]},
+  { title: 'Look', note: '', items: [
+    { k: 'tint', label: 'Tint', color: true },
+    { k: 'size', label: 'Orb size (pt)', min: 120, max: 300, step: 5 },
+    { k: 'zoom', label: 'View zoom (lab only)', min: 1, max: 3, step: 0.1, fmt: v => v.toFixed(1) + '×', labOnly: true },
+  ]},
+];
+const PRESETS = {
+  'Waveform today': {},
+  'Thames': { lowHz: 130, highHz: 3500, fft: 512, floorDb: -64, history: 0.6, gain: 0.31, dotBase: 0.65, dotGain: 0.2, gamma: 1.5, op2: 0.62, spin: 0.08, size: 170 },
+  'Punchier': { floorDb: -54, gamma: 1.6, dotGain: 4.5, gain: 0.7, gate: 0.08, hot: 0.5 },
+  'Calm': { floorDb: -72, history: 1.2, gamma: 0.8, dotGain: 1.8, gain: 0.35, spin: 0.08 },
+  'Voice only': { lowHz: 100, highHz: 4500, tilt: 4, floorDb: -58, pitchCurve: 0.8, ageFalloff: 0.35 },
+};
+
+/* ---------- state ---------- */
+let work = load() || { ...DEFAULTS };
+function load() { try { const s = JSON.parse(localStorage.getItem('orbLab') || 'null'); return s ? { ...DEFAULTS, ...s } : null; } catch (e) { return null; } }
+function save() { try { localStorage.setItem('orbLab', JSON.stringify(work)); } catch (e) {} }
+
+/* ---------- FFT, ported from SpectrumBuilder ---------- */
+const fftCache = new Map();
+function fftFor(n) {
+  if (fftCache.has(n)) return fftCache.get(n);
+  const bits = Math.log2(n), rev = new Uint32Array(n);
+  for (let i = 0; i < n; i++) { let r = 0; for (let b = 0; b < bits; b++) if (i & (1 << b)) r |= 1 << (bits - 1 - b); rev[i] = r; }
+  const cos = new Float64Array(n / 2), sin = new Float64Array(n / 2);
+  for (let i = 0; i < n / 2; i++) { cos[i] = Math.cos(2 * Math.PI * i / n); sin[i] = -Math.sin(2 * Math.PI * i / n); }
+  const hann = new Float64Array(n); let sumsq = 0;
+  for (let i = 0; i < n; i++) { hann[i] = 0.5 * (1 - Math.cos(2 * Math.PI * i / n)); sumsq += hann[i] * hann[i]; }
+  const f = { rev, cos, sin, hann, sumsq, re: new Float64Array(n), im: new Float64Array(n), run(re, im) {
+    for (let i = 0; i < n; i++) { const j = rev[i]; if (j > i) { let t = re[i]; re[i] = re[j]; re[j] = t; t = im[i]; im[i] = im[j]; im[j] = t; } }
+    for (let size = 2; size <= n; size <<= 1) {
+      const half = size >> 1, step = n / size;
+      for (let s = 0; s < n; s += size) for (let k = 0; k < half; k++) {
+        const c = cos[k * step], si = sin[k * step], a = s + k, b = a + half;
+        const tr = re[b] * c - im[b] * si, ti = re[b] * si + im[b] * c;
+        re[b] = re[a] - tr; im[b] = im[a] - ti; re[a] += tr; im[a] += ti;
+      }
+    }
+  } };
+  fftCache.set(n, f); return f;
+}
+
+/* A shared pool of samples (a clip, or a growing microphone buffer). */
+class Source { constructor(sr, samples, length) { this.sr = sr; this.samples = samples; this.length = length; } }
+
+/* The spectrum of a source under one set of spectrum settings, made column by column when asked for. */
+class Spec {
+  constructor(source, p) {
+    this.src = source; this.sr = source.sr;
+    this.bands = p.bands; this.n = p.fft; this.cache = new Map();
+    const hi = Math.min(p.highHz, this.sr / 2), lo = Math.min(p.lowHz, hi * 0.5);
+    const edges = []; for (let b = 0; b <= p.bands; b++) edges.push(lo * Math.pow(hi / lo, b / p.bands));
+    this.binEdges = edges.map(e => e * this.n / this.sr);
+    this.tiltGain = []; for (let b = 0; b < p.bands; b++) { const centre = Math.sqrt(edges[b] * edges[b + 1]); this.tiltGain.push(Math.pow(10, p.tilt * Math.log2(centre / 1000) / 10)); }
+    this.power = new Float64Array(this.n / 2); this.cum = new Float64Array(this.n / 2 + 1);
+  }
+  count() { return Math.max(0, Math.floor(this.src.length * CPS / this.sr + 1e-9)); }
+  col(c) {
+    let v = this.cache.get(c); if (v) return v;
+    const f = fftFor(this.n), n = this.n, half = n / 2, s = this.src.samples;
+    const end = Math.round((c + 1) * this.sr / CPS), start = end - n;
+    for (let i = 0; i < n; i++) { const k = start + i; f.re[i] = (k >= 0 ? s[k] : 0) * f.hann[i]; f.im[i] = 0; }
+    f.run(f.re, f.im);
+    const norm = 2 / (n * f.sumsq), power = this.power, cum = this.cum;
+    power[0] = 0; for (let k = 1; k < half; k++) power[k] = (f.re[k] * f.re[k] + f.im[k] * f.im[k]) * norm;
+    cum[0] = 0; for (let k = 0; k < half; k++) cum[k + 1] = cum[k] + power[k];
+    const upTo = x => { const u = Math.max(0, x + 0.5), i = Math.min(half - 1, Math.floor(u)); return cum[i] + power[i] * Math.min(1, u - i); };
+    v = new Float32Array(this.bands);
+    for (let b = 0; b < this.bands; b++) v[b] = Math.sqrt(Math.max(0, upTo(this.binEdges[b + 1]) - upTo(this.binEdges[b])) * this.tiltGain[b]);
+    this.cache.set(c, v); if (this.cache.size > 6000) this.cache.delete(this.cache.keys().next().value);
+    return v;
+  }
+}
+
+/* ---------- the orb, ported from OrbModel / SpectrumOrbView / OrbProjection ---------- */
+function makeModel(count) {
+  const ux = new Float32Array(count), uy = new Float32Array(count), uz = new Float32Array(count), age = new Float32Array(count), pitch = new Float32Array(count);
+  const golden = Math.PI * (3 - Math.sqrt(5));
+  for (let i = 0; i < count; i++) {
+    const y = 1 - 2 * (i + 0.5) / count, ring = Math.sqrt(1 - y * y), a = golden * i;
+    ux[i] = Math.cos(a) * ring; uy[i] = y; uz[i] = Math.sin(a) * ring;
+    age[i] = Math.abs(Math.asin(y)) / (Math.PI / 2);
+    pitch[i] = Math.abs(Math.atan2(Math.sin(a), Math.cos(a))) / Math.PI;
+  }
+  return { count, ux, uy, uz, age, pitch };
+}
+const clamp = (v, a, b) => Math.max(a, Math.min(b, v));
+const catmull = (p0, p1, p2, p3, t) => 0.5 * ((2 * p1) + (-p0 + p2) * t + (2 * p0 - 5 * p1 + 4 * p2 - p3) * t * t + (-p0 + 3 * p1 - 3 * p2 + p3) * t * t * t);
+const height = (v, floor) => { const m = Math.abs(v); if (m <= 0) return 0; const db = 20 * Math.log10(m); return clamp((db - floor) / -floor, 0, 1); };
+const hexRGB = h => [1, 3, 5].map(i => parseInt(h.slice(i, i + 2), 16));
+
+/* Where the audio is: `heard` is seconds into the clip, or null for a live microphone. */
+function frameState(spec, p, heard) {
+  const live = heard == null, count = spec.count();
+  const end = live ? count : Math.min(count, Math.floor((heard + p.lead) * CPS));
+  const needed = Math.floor(p.history * CPS) + 16, base = end - needed;
+  const newest = end - 2;
+  const pos = live ? newest : Math.min(newest, (heard - p.latency + p.sync) * CPS - 0.5);
+  const delay = p.fft / 2 / spec.sr * CPS - 0.5;
+  return { end, needed, base, playhead: Math.min(newest, pos + delay) };
+}
+function levelAt(spec, p, fs, time, band) {
+  const bands = spec.bands; if (fs.end < 2) return 0;
+  const i = Math.floor(time), t = time - i;
+  const lowB = clamp(Math.floor(band), 0, bands - 1), highB = Math.min(bands - 1, lowB + 1), mix = clamp(band - lowB, 0, 1);
+  const at = (k, b) => { const j = clamp(k, fs.base, fs.end - 1); return j < 0 ? 0 : height(spec.col(j)[b], p.floorDb); };
+  const along = b => catmull(at(i - 1, b), at(i, b), at(i + 1, b), at(i + 2, b), t);
+  const low = along(lowB), high = lowB === highB ? low : along(highB);
+  return Math.max(0, low * (1 - mix) + high * mix);
+}
+const shape = (v, p, age) => {
+  let x = p.gate > 0 ? Math.max(0, v - p.gate) / (1 - p.gate) : v;
+  if (p.gamma !== 1) x = Math.pow(x, p.gamma);
+  return x * (1 - p.ageFalloff * age);
+};
+
+function drawOrb(canvas, spec, p, heard, spinAngle, model) {
+  const dpr = (window.devicePixelRatio || 1) * p.zoom, S = p.size;
+  const px = Math.round(S * dpr);
+  if (canvas.width !== px) { canvas.width = px; canvas.height = px; canvas.style.width = (S * p.zoom) + 'px'; canvas.style.height = (S * p.zoom) + 'px'; }
+  const g = canvas.getContext('2d'); g.setTransform(dpr, 0, 0, dpr, 0, 0); g.clearRect(0, 0, S, S);
+  const fs = frameState(spec, p, heard), bands = spec.bands, histCols = p.history * CPS;
+  const R = S / 2 / (1 + p.gain) * 0.94, sy = Math.sin(spinAngle), cy = Math.cos(spinAngle), sx = Math.sin(p.tip), cx = Math.cos(p.tip);
+  const [r, gr, b] = hexRGB(p.tint), ops = [p.op0, p.op1, p.op2, p.op3], layers = [[], [], [], []];
+  for (let i = 0; i < model.count; i++) {
+    const age = model.age[i], raw = levelAt(spec, p, fs, fs.playhead - age * histCols, Math.pow(model.pitch[i], p.pitchCurve) * (bands - 1));
+    const lv = shape(raw, p, age), out = 1 + p.gain * lv, dot = p.dotBase + p.dotGain * lv;
+    const x1 = model.ux[i] * cy + model.uz[i] * sy, z1 = -model.ux[i] * sy + model.uz[i] * cy;
+    const y2 = model.uy[i] * cx - z1 * sx, z2 = model.uy[i] * sx + z1 * cx, depth = (z2 + 1) / 2;
+    layers[Math.min(3, Math.floor(depth * 4))].push(S / 2 + x1 * out * R, S / 2 - y2 * out * R, dot * ((1 - p.perspective) + p.perspective * depth), lv);
+  }
+  for (let l = 0; l < 4; l++) {
+    const a = layers[l];
+    if (p.hot === 0) { g.fillStyle = `rgba(${r},${gr},${b},${ops[l]})`; g.beginPath(); for (let k = 0; k < a.length; k += 4) { g.moveTo(a[k] + a[k + 2], a[k + 1]); g.arc(a[k], a[k + 1], a[k + 2], 0, 6.2832); } g.fill(); continue; }
+    for (let k = 0; k < a.length; k += 4) {
+      const m = clamp(a[k + 3] * p.hot, 0, 1);
+      g.fillStyle = `rgba(${Math.round(r + (255 - r) * m)},${Math.round(gr + (255 - gr) * m)},${Math.round(b + (255 - b) * m)},${ops[l]})`;
+      g.beginPath(); g.arc(a[k], a[k + 1], a[k + 2], 0, 6.2832); g.fill();
+    }
+  }
+  return fs;
+}
+
+/* ---------- audio: demo voice, file, microphone ---------- */
+const RATE = 24000; // the rate Thames decodes replies at
+let source = null, audio = null, node = null, srcNode = null, micStream = null;
+const T = { mode: 'clip', playing: false, base: 0, startedAt: 0, dur: 0 };
+const $ = id => document.getElementById(id);
+const setStatus = s => { $('status').textContent = s; };
+
+async function makeDemo() {
+  const dur = 9, ctx = new OfflineAudioContext(1, RATE * dur, RATE);
+  const vowels = { a: [800, 1200, 2500], i: [300, 2300, 3000], u: [320, 800, 2300], e: [500, 1800, 2500], o: [500, 900, 2400] };
+  const syl = [[0.25, 0.32, 'a', 130, 150], [0.62, 0.22, 'i', 150, 170], [0.9, 0.4, 'o', 170, 120], [1.45, 0.2, 'e', 125, 140], [1.72, 0.5, 'a', 140, 105],
+    [3.0, 0.3, 'u', 120, 135], [3.4, 0.25, 'e', 140, 165], [3.72, 0.3, 'i', 165, 150], [4.1, 0.6, 'o', 150, 100],
+    [6.0, 0.22, 'a', 115, 130], [6.3, 0.22, 'o', 130, 150], [6.6, 0.28, 'i', 150, 175], [6.95, 0.7, 'a', 175, 110]];
+  const osc = ctx.createOscillator(); osc.type = 'sawtooth'; osc.frequency.value = 130;
+  const amp = ctx.createGain(); amp.gain.value = 0; osc.connect(amp);
+  const filters = [0, 1, 2].map(i => { const f = ctx.createBiquadFilter(); f.type = 'bandpass'; f.Q.value = [9, 11, 13][i]; const gn = ctx.createGain(); gn.gain.value = [1, 0.7, 0.45][i]; amp.connect(f); f.connect(gn); gn.connect(ctx.destination); return f; });
+  const noise = ctx.createBufferSource(), nb = ctx.createBuffer(1, RATE * dur, RATE), nd = nb.getChannelData(0);
+  for (let i = 0; i < nd.length; i++) nd[i] = Math.random() * 2 - 1;
+  noise.buffer = nb; const hp = ctx.createBiquadFilter(); hp.type = 'highpass'; hp.frequency.value = 4500; const ng = ctx.createGain(); ng.gain.value = 0;
+  noise.connect(hp); hp.connect(ng); ng.connect(ctx.destination);
+  for (const [t, d, v, f0, f1] of syl) {
+    amp.gain.setValueAtTime(0, t); amp.gain.linearRampToValueAtTime(0.5, t + 0.04); amp.gain.setValueAtTime(0.5, t + d - 0.06); amp.gain.linearRampToValueAtTime(0, t + d);
+    osc.frequency.setValueAtTime(f0, t); osc.frequency.linearRampToValueAtTime(f1, t + d);
+    filters.forEach((f, i) => { f.frequency.setValueAtTime(vowels[v][i], t); });
+    ng.gain.setValueAtTime(0, t - 0.09); ng.gain.linearRampToValueAtTime(0.12, t - 0.04); ng.gain.linearRampToValueAtTime(0, t);
+  }
+  osc.start(); noise.start();
+  const buf = await ctx.startRendering(), data = buf.getChannelData(0);
+  let peak = 0; for (let i = 0; i < data.length; i++) peak = Math.max(peak, Math.abs(data[i]));
+  const out = new Float32Array(data.length); for (let i = 0; i < data.length; i++) out[i] = data[i] / (peak || 1) * 0.6;
+  return out;
+}
+async function decodeFile(file) {
+  const ctx = new (window.AudioContext || window.webkitAudioContext)();
+  const buf = await ctx.decodeAudioData(await file.arrayBuffer()); ctx.close();
+  const len = Math.min(Math.ceil(buf.duration * RATE), RATE * 40), off = new OfflineAudioContext(1, len, RATE);
+  const s = off.createBufferSource(); s.buffer = buf; s.connect(off.destination); s.start();
+  return (await off.startRendering()).getChannelData(0).slice();
+}
+function ensureAudio() { if (!audio) audio = new (window.AudioContext || window.webkitAudioContext)(); if (audio.state === 'suspended') audio.resume(); return audio; }
+function setClip(samples) {
+  stopMic(); stopClip();
+  source = new Source(RATE, samples, samples.length); T.mode = 'clip'; T.dur = samples.length / RATE; T.base = 0; T.playing = false;
+  $('scrub').max = T.dur; $('scrub').disabled = false; $('transport').hidden = false; rebuildSpecs(); updateTransport();
+}
+function heard() { if (T.mode !== 'clip') return null; let h = T.playing ? T.base + (audio.currentTime - T.startedAt) : T.base; return T.dur ? ((h % T.dur) + T.dur) % T.dur : 0; }
+function stopClip() { if (srcNode) { try { srcNode.stop(); } catch (e) {} srcNode.disconnect(); srcNode = null; } }
+function play() {
+  if (T.mode !== 'clip' || !source) return; const ctx = ensureAudio();
+  const buf = ctx.createBuffer(1, source.length, RATE); buf.copyToChannel(source.samples.subarray(0, source.length), 0);
+  stopClip(); srcNode = ctx.createBufferSource(); srcNode.buffer = buf; srcNode.loop = true; srcNode.connect(ctx.destination);
+  srcNode.start(0, T.base); T.startedAt = ctx.currentTime; T.playing = true; updateTransport();
+}
+function pause() { if (!T.playing) return; T.base = heard(); stopClip(); T.playing = false; updateTransport(); }
+function updateTransport() { $('playBtn').textContent = T.playing ? 'Pause' : 'Play'; $('srcDemo').setAttribute('aria-pressed', String(T.mode === 'clip' && source && source.tag === 'demo')); $('srcMic').setAttribute('aria-pressed', String(T.mode === 'mic')); }
+async function startMic() {
+  try {
+    pause(); micStream = await navigator.mediaDevices.getUserMedia({ audio: { echoCancellation: false, noiseSuppression: false, autoGainControl: false } });
+  } catch (e) { setStatus('Microphone is blocked here. Use the demo voice or open a file.'); return; }
+  const ctx = ensureAudio(), cap = ctx.sampleRate * 60;
+  source = new Source(ctx.sampleRate, new Float32Array(cap), 0); T.mode = 'mic'; rebuildSpecs();
+  const input = ctx.createMediaStreamSource(micStream); node = ctx.createScriptProcessor(2048, 1, 1);
+  node.onaudioprocess = e => { const d = e.inputBuffer.getChannelData(0); if (source.length + d.length > source.samples.length) { source.samples.copyWithin(0, d.length * 4); source.length -= d.length * 4; specs.forEach(s => s.cache.clear()); } source.samples.set(d, source.length); source.length += d.length; };
+  input.connect(node); node.connect(ctx.destination); $('transport').hidden = true; setStatus('Listening to the microphone'); updateTransport();
+}
+function stopMic() { if (node) { node.disconnect(); node.onaudioprocess = null; node = null; } if (micStream) { micStream.getTracks().forEach(t => t.stop()); micStream = null; } }
+
+/* ---------- parameters rail ---------- */
+const rows = {};
+function buildRail() {
+  const rail = $('rail');
+  const pres = $('presets');
+  for (const name of Object.keys(PRESETS)) { const b = document.createElement('button'); b.textContent = name; b.onclick = () => { work = { ...DEFAULTS, ...PRESETS[name], tint: work.tint, zoom: work.zoom }; syncRail(); onChange(true); }; pres.appendChild(b); }
+  for (const grp of GROUPS) {
+    const sec = document.createElement('div'); sec.className = 'group';
+    sec.innerHTML = `<h2>${grp.title}</h2>${grp.note ? `<p class="gnote">${grp.note}</p>` : '<div style="height:8px"></div>'}`;
+    for (const it of grp.items) {
+      const row = document.createElement('div'); row.className = 'row'; rows[it.k] = { row, it };
+      const tags = (it.isNew ? ' <span class="tag">new</span>' : '') + (it.labOnly ? ' <span class="tag">lab only</span>' : '');
+      row.innerHTML = `<label for="p_${it.k}" title="Double-click to reset">${it.label}${tags}</label><output id="o_${it.k}"></output>`;
+      let input;
+      if (it.choices) { input = document.createElement('select'); it.choices.forEach(c => { const o = document.createElement('option'); o.value = c; o.textContent = c; input.appendChild(o); }); }
+      else if (it.color) { input = document.createElement('input'); input.type = 'color'; }
+      else { input = document.createElement('input'); input.type = 'range'; input.min = it.min; input.max = it.max; input.step = it.step; }
+      input.id = 'p_' + it.k; row.appendChild(input);
+      input.addEventListener('input', () => { work[it.k] = it.color ? input.value : Number(input.value); onChange(!!(GROUPS[0].items.includes(it) || it.k === 'dots')); });
+      row.querySelector('label').addEventListener('dblclick', () => { work[it.k] = DEFAULTS[it.k]; syncRail(); onChange(true); });
+      sec.appendChild(row);
+    }
+    rail.appendChild(sec);
+  }
+  const out = document.createElement('div'); out.className = 'group';
+  out.innerHTML = `<h2>Hand-off</h2><p class="gnote">What differs from Waveform today, ready to paste into a brief.</p><div class="bar"><button id="copyBtn">Copy changes</button><button id="swiftBtn">Copy Swift</button><button id="resetBtn">Reset all</button></div><pre id="diff"></pre>`;
+  rail.appendChild(out);
+  $('copyBtn').onclick = async () => { const t = $('diff').textContent; try { await navigator.clipboard.writeText(t); $('copyBtn').textContent = 'Copied'; } catch (e) { const r = document.createRange(); r.selectNodeContents($('diff')); getSelection().removeAllRanges(); getSelection().addRange(r); $('copyBtn').textContent = 'Selected, press copy'; } setTimeout(() => { $('copyBtn').textContent = 'Copy changes'; }, 1500); };
+  $('swiftBtn').onclick = async () => { const t = swiftText(); try { await navigator.clipboard.writeText(t); $('swiftBtn').textContent = 'Copied'; } catch (e) { $('diff').textContent = t; $('swiftBtn').textContent = 'Shown below'; } setTimeout(() => { $('swiftBtn').textContent = 'Copy Swift'; }, 1500); };
+  $('resetBtn').onclick = () => { work = { ...DEFAULTS }; syncRail(); onChange(true); };
+  syncRail();
+}
+function syncRail() {
+  for (const k in rows) {
+    const { row, it } = rows[k], v = work[k], el = $('p_' + k);
+    el.value = v; $('o_' + k).textContent = it.color ? v : (it.fmt ? it.fmt(v) : String(v));
+    row.classList.toggle('changed', v !== DEFAULTS[k]);
+  }
+}
+const WHERE = { bands: 'SpectrumBuilder(bands:)', lowHz: 'SpectrumBuilder(lowHz:)', highHz: 'SpectrumBuilder(highHz:)', tilt: 'SpectrumBuilder(tiltDBPerOctave:)', fft: 'SpectrumBuilder(fftSize:) and SpectrumOrbView(fftSize:)', floorDb: 'SpectrumOrbView(scale: .decibels(floor:))', history: 'SpectrumOrbView(historySeconds:)', gain: 'SpectrumOrbView(gain:)', dots: 'SpectrumOrbView(dotCount:)', latency: 'SpectrumOrbView(latency:)', tint: 'SpectrumOrbView(tint:)', dotBase: 'OrbStyle(dotBase:)', dotGain: 'OrbStyle(dotGrowth:)', gamma: 'OrbStyle(contrast:)', op0: 'OrbStyle(opacities:) [0]', op1: 'OrbStyle(opacities:) [1]', op2: 'OrbStyle(opacities:) [2]', op3: 'OrbStyle(opacities:) [3]', spin: 'OrbStyle(spinRate:)', tip: 'OrbStyle(tip:)', perspective: 'not in the package yet', gate: 'not in the package yet', ageFalloff: 'not in the package yet', pitchCurve: 'not in the package yet', hot: 'not in the package yet', lead: 'your feeder (Thames: SpeechSpectrum.lead)', size: 'your view frame' };
+function swiftText() {
+  const w = work, f = n => String(Number(n.toFixed(3))), ops = [w.op0, w.op1, w.op2, w.op3].map(f).join(', ');
+  return `let builder = SpectrumBuilder(
+  sampleRate: sampleRate, columnsPerSecond: 120, fftSize: ${w.fft}, bands: ${w.bands},
+  lowHz: ${w.lowHz}, highHz: ${w.highHz}, tiltDBPerOctave: ${f(w.tilt)})
+
+SpectrumOrbView(
+  spectrum: ring, columnsPerSecond: 120, sampleRate: sampleRate, fftSize: ${w.fft}, clock: clock,
+  latency: ${f(w.latency)}, scale: .decibels(floor: ${w.floorDb}), gain: ${f(w.gain)}, historySeconds: ${f(w.history)},
+  tint: tint, dotCount: ${w.dots},
+  style: OrbStyle(
+    dotBase: ${f(w.dotBase)}, dotGrowth: ${f(w.dotGain)}, contrast: ${f(w.gamma)},
+    opacities: [${ops}], spinRate: ${f(w.spin)}, tip: ${f(w.tip)}))`;
+}
+function diffText() {
+  const lines = Object.keys(DEFAULTS).filter(k => work[k] !== DEFAULTS[k] && k !== 'zoom' && k !== 'sync').map(k => `${k}: ${DEFAULTS[k]} -> ${work[k]}   // ${WHERE[k] || ''}`);
+  return lines.length ? lines.join('\n') : 'Same as Waveform today.';
+}
+
+/* ---------- spectrum instances, model, loop ---------- */
+let specs = [], specRef = null, specWork = null, model = null, modelRef = null, spin = 0, lastT = 0;
+const specKey = p => [p.bands, p.lowHz, p.highHz, p.tilt, p.fft].join('|');
+function rebuildSpecs() { if (!source) return; specRef = new Spec(source, DEFAULTS); specWork = specKey(work) === specKey(DEFAULTS) ? specRef : new Spec(source, work); specs = [specRef, specWork]; }
+let rebuildTimer = 0;
+function onChange(spectrumChanged) {
+  syncRail(); save(); $('diff').textContent = diffText();
+  if (work.dots !== model.count) model = makeModel(work.dots);
+  if (spectrumChanged) { clearTimeout(rebuildTimer); rebuildTimer = setTimeout(rebuildSpecs, 60); }
+}
+
+const strip = $('strip'), curve = $('curve');
+function fitWide(c) { const w = Math.round(c.clientWidth * (window.devicePixelRatio || 1)); if (c.width !== w) c.width = w; }
+function drawStrip(fs) {
+  fitWide(strip); const g = strip.getContext('2d'), W = strip.width, H = strip.height; g.clearRect(0, 0, W, H);
+  if (!specWork || fs.end < 2) return;
+  const cols = 360, cw = W / cols, bands = specWork.bands, ch = H / bands, [r, gr, b] = hexRGB(work.tint);
+  for (let c = 0; c < cols; c++) {
+    const idx = fs.end - cols + c; if (idx < 0) continue; const v = specWork.col(idx);
+    for (let k = 0; k < bands; k++) { const h = height(v[k], work.floorDb); if (h < 0.01) continue; g.fillStyle = `rgba(${r},${gr},${b},${Math.pow(h, 1.3)})`; g.fillRect(c * cw, H - (k + 1) * ch, cw + 0.6, ch + 0.6); }
+  }
+  const right = (cols - (fs.end - 1 - fs.playhead)) * cw, left = right - work.history * CPS * cw;
+  g.strokeStyle = '#f0c674'; g.lineWidth = 1.5; g.beginPath(); g.moveTo(left, 3); g.lineTo(left, H - 3); g.moveTo(right, 3); g.lineTo(right, H - 3); g.moveTo(left, 3); g.lineTo(right, 3); g.moveTo(left, H - 3); g.lineTo(right, H - 3); g.stroke();
+}
+function drawCurve() {
+  fitWide(curve); const g = curve.getContext('2d'), W = curve.width, H = curve.height, pad = 18; g.clearRect(0, 0, W, H);
+  const line = (p, which, color, width) => {
+    const max = which === 'push' ? Math.max(0.01, p.gain) : Math.max(0.01, p.dotBase + p.dotGain); g.strokeStyle = color; g.lineWidth = width; g.beginPath();
+    for (let i = 0; i <= 100; i++) { const x = i / 100, s = shape(x, p, 0), y = which === 'push' ? p.gain * s : p.dotBase + p.dotGain * s; const X = pad + x * (W - 2 * pad), Y = H - pad - (y / max) * (H - 2 * pad); i ? g.lineTo(X, Y) : g.moveTo(X, Y); }
+    g.stroke();
+  };
+  g.strokeStyle = '#213630'; g.lineWidth = 1; g.strokeRect(pad, pad, W - 2 * pad, H - 2 * pad);
+  line(DEFAULTS, 'push', 'rgba(143,240,208,0.25)', 1.5); line(DEFAULTS, 'size', 'rgba(240,198,116,0.25)', 1.5);
+  line(work, 'push', '#8ff0d0', 2); line(work, 'size', '#f0c674', 2);
+  g.fillStyle = '#7f968e'; g.font = `${11 * (window.devicePixelRatio || 1)}px ui-monospace, Menlo, monospace`;
+  g.fillText('push out (' + (work.gain).toFixed(2) + ' max)', pad + 8, pad + 14 * (window.devicePixelRatio || 1)); g.fillStyle = '#f0c674'; g.fillText('dot size (' + (work.dotBase + work.dotGain).toFixed(1) + ' pt max)', pad + 8, pad + 28 * (window.devicePixelRatio || 1));
+}
+
+function frame(now) {
+  const t = now / 1000, dt = lastT ? Math.min(0.1, t - lastT) : 0; lastT = t; spin += dt * work.spin;
+  if (specRef && model) {
+    const h = heard();
+    drawOrb($('orbA'), specRef, { ...DEFAULTS, size: work.size, zoom: work.zoom, tint: work.tint, spin: work.spin, tip: work.tip, dots: work.dots }, h, spin, modelRef);
+    const fs = drawOrb($('orbB'), specWork, work, h, spin, model);
+    drawStrip(fs);
+    if (T.mode === 'clip') { if (T.playing) $('scrub').value = h; $('clock').textContent = h.toFixed(1) + ' / ' + T.dur.toFixed(1) + ' s'; }
+  }
+  drawCurve();
+  requestAnimationFrame(frame);
+}
+
+/* ---------- wiring ---------- */
+$('playBtn').onclick = () => (T.playing ? pause() : play());
+$('scrub').addEventListener('input', e => { const v = Number(e.target.value); if (T.playing) { pause(); T.base = v; play(); } else T.base = v; });
+$('srcDemo').onclick = async () => { if (source && source.tag === 'demo' && T.mode === 'clip') return; setStatus('Making the demo voice…'); const s = await makeDemo(); setClip(s); source.tag = 'demo'; updateTransport(); setStatus('Demo voice: 13 syllables, three phrases'); };
+$('srcFile').onclick = () => $('fileIn').click();
+$('fileIn').onchange = async e => { const f = e.target.files[0]; if (f) await loadFile(f); };
+$('srcMic').onclick = () => (T.mode === 'mic' ? $('srcDemo').click() : startMic());
+async function loadFile(f) { setStatus('Reading ' + f.name + '…'); try { setClip(await decodeFile(f)); source.tag = 'file'; updateTransport(); setStatus(f.name + ' (first 40 s)'); } catch (e) { setStatus('Could not read that file.'); } }
+addEventListener('dragover', e => e.preventDefault());
+addEventListener('drop', e => { e.preventDefault(); const f = e.dataTransfer.files[0]; if (f) loadFile(f); });
+
+buildRail();
+model = makeModel(work.dots); modelRef = makeModel(DEFAULTS.dots);
+$('diff').textContent = diffText();
+makeDemo().then(s => { setClip(s); source.tag = 'demo'; updateTransport(); setStatus('Demo voice: 13 syllables, three phrases. Press Play.'); });
+requestAnimationFrame(frame);
+</script>
+</body>
+</html>

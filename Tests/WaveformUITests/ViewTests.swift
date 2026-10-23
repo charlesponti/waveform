@@ -93,4 +93,12 @@ import WaveformCore
     let v = image(SpectrumOrbView(spectrum: spectrum(), sampleRate: 48_000, fftSize: 2_048, clock: clock, gain: 0.7, historySeconds: 0.5))
     #expect(ink(v) > 0)
   }
+
+  @Test func aStyledSpectrumOrbStillDrawsAndFaintLayersDrawLess() {
+    let bold = ink(image(SpectrumOrbView(spectrum: spectrum(), showStats: false, turning: false)))
+    let faint = ink(image(SpectrumOrbView(
+      spectrum: spectrum(), showStats: false, turning: false,
+      style: OrbStyle(dotBase: 0.65, dotGrowth: 0.2, contrast: 1.5, opacities: [0.1, 0.2, 0.3, 0.4]))))
+    #expect(faint > 0 && faint < bold)
+  }
 }
