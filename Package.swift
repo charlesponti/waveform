@@ -5,7 +5,7 @@ import PackageDescription
 // `WaveformCore` has no UI and is where the accuracy and the speed live; `WaveformUI` is the SwiftUI
 // views on top of it; `WaveformApp` is a macOS window to look at them (not a product).
 let package = Package(
-  name: "waveform-ios",
+  name: "waveform",
   platforms: [.macOS(.v15), .iOS(.v18)],
   products: [
     .library(name: "WaveformCore", targets: ["WaveformCore"]),

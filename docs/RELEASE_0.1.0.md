@@ -1,4 +1,4 @@
-# waveform-ios 0.1.0
+# waveform 0.1.0
 
 First release: an accurate voice waveform and an orb of dots that listens, for iOS 18 and macOS 15.
 
@@ -26,7 +26,7 @@ First release: an accurate voice waveform and an orb of dots that listens, for i
 ## Install
 
 ```swift
-.package(url: "https://github.com/charlesponti/waveform-ios", from: "0.1.0")
+.package(url: "https://github.com/charlesponti/waveform", from: "0.1.0")
 ```
 
-Needs Swift 6.2. See the [README](https://github.com/charlesponti/waveform-ios#readme) and the [live explainer](https://charlesponti.github.io/voice-orb/).
+Needs Swift 6.2. See the [README](https://github.com/charlesponti/waveform#readme) and the [live explainer](https://charlesponti.github.io/voice-orb/).

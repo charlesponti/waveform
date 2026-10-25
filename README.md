@@ -1,8 +1,8 @@
-# waveform-ios
+# waveform
 
-[![CI](https://github.com/charlesponti/waveform-ios/actions/workflows/ci.yml/badge.svg)](https://github.com/charlesponti/waveform-ios/actions/workflows/ci.yml)
-[![Swift versions](https://img.shields.io/endpoint?url=https%3A%2F%2Fswiftpackageindex.com%2Fapi%2Fpackages%2Fcharlesponti%2Fwaveform-ios%2Fbadge%3Ftype%3Dswift-versions)](https://swiftpackageindex.com/charlesponti/waveform-ios)
-[![Platforms](https://img.shields.io/endpoint?url=https%3A%2F%2Fswiftpackageindex.com%2Fapi%2Fpackages%2Fcharlesponti%2Fwaveform-ios%2Fbadge%3Ftype%3Dplatforms)](https://swiftpackageindex.com/charlesponti/waveform-ios)
+[![CI](https://github.com/charlesponti/waveform/actions/workflows/ci.yml/badge.svg)](https://github.com/charlesponti/waveform/actions/workflows/ci.yml)
+[![Swift versions](https://img.shields.io/endpoint?url=https%3A%2F%2Fswiftpackageindex.com%2Fapi%2Fpackages%2Fcharlesponti%2Fwaveform%2Fbadge%3Ftype%3Dswift-versions)](https://swiftpackageindex.com/charlesponti/waveform)
+[![Platforms](https://img.shields.io/endpoint?url=https%3A%2F%2Fswiftpackageindex.com%2Fapi%2Fpackages%2Fcharlesponti%2Fwaveform%2Fbadge%3Ftype%3Dplatforms)](https://swiftpackageindex.com/charlesponti/waveform)
 ![Line coverage](https://img.shields.io/badge/line%20coverage-100%25-brightgreen)
 [![License: MIT](https://img.shields.io/badge/license-MIT-lightgrey)](LICENSE)
 
@@ -20,14 +20,14 @@ equator. [Live demo and explainer](https://charlesponti.github.io/voice-orb/) ·
 Swift Package Manager:
 
 ```swift
-.package(url: "https://github.com/charlesponti/waveform-ios", from: "0.1.0")
+.package(url: "https://github.com/charlesponti/waveform", from: "0.1.0")
 ```
 
 then, in your target:
 
 ```swift
-.product(name: "WaveformUI", package: "waveform-ios")     // SwiftUI views (includes Core)
-.product(name: "WaveformCore", package: "waveform-ios")   // no UI: the maths, rings, clocks, microphone
+.product(name: "WaveformUI", package: "waveform")     // SwiftUI views (includes Core)
+.product(name: "WaveformCore", package: "waveform")   // no UI: the maths, rings, clocks, microphone
 ```
 
 Needs iOS 18 or macOS 15 and Swift 6.2. Add `NSMicrophoneUsageDescription` to your Info.plist if you use the
@@ -108,7 +108,7 @@ swift run -c release WaveformApp --spectrum-snapshot out.png
 
 ## Releases
 
-See [CHANGELOG.md](CHANGELOG.md) and the [releases page](https://github.com/charlesponti/waveform-ios/releases).
+See [CHANGELOG.md](CHANGELOG.md) and the [releases page](https://github.com/charlesponti/waveform/releases).
 
 ## License
 
