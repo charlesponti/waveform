@@ -1,0 +1,400 @@
+<title>Speaking Orb Options</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Hanken+Grotesk:wght@400;500;600&family=Instrument+Serif&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+<style>
+/* Layout: a calm comparison bench. Three phones side by side share one clock, so the same reply plays in each. Spec notes sit under each phone. */
+:root {
+  --bg: #e8edef;
+  --fg: #12202a;
+  --muted: #51636d;
+  --line: #c6d1d6;
+  --card: #f4f7f8;
+  --screen: #f3f6f7;
+  --orb-rgb: 24 106 126;
+  --ok: #2d7a4f;
+  --f-display: "Instrument Serif", Georgia, serif;
+  --f-body: "Hanken Grotesk", system-ui, sans-serif;
+  --f-mono: "JetBrains Mono", ui-monospace, monospace;
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --bg: #0c1317; --fg: #e3edf0; --muted: #94a8b0; --line: #26343b; --card: #121c21;
+    --screen: #0a1115; --orb-rgb: 112 196 210; --ok: #6cc592; color-scheme: dark;
+  }
+}
+:root[data-theme="dark"] {
+  --bg: #0c1317; --fg: #e3edf0; --muted: #94a8b0; --line: #26343b; --card: #121c21;
+  --screen: #0a1115; --orb-rgb: 112 196 210; --ok: #6cc592; color-scheme: dark;
+}
+* { box-sizing: border-box; }
+body {
+  background: var(--bg); color: var(--fg); font-family: var(--f-body); font-size: 15px; line-height: 1.55;
+  padding-block: 40px 72px;
+  padding-left: max(16px, env(safe-area-inset-left, 0px));
+  padding-right: max(16px, env(safe-area-inset-right, 0px));
+}
+.wrap { max-width: 1180px; margin: 0 auto; display: flex; flex-direction: column; gap: 40px; }
+h1 { font-family: var(--f-display); font-weight: 400; font-size: clamp(34px, 6vw, 52px); line-height: 1.05; margin: 0; text-wrap: balance; }
+h2 { font-family: var(--f-display); font-weight: 400; font-size: 28px; margin: 0; text-wrap: balance; }
+p { margin: 0; max-width: 65ch; }
+.eyebrow { font-family: var(--f-mono); font-size: 11px; letter-spacing: .08em; text-transform: uppercase; color: var(--muted); }
+.lede { color: var(--muted); font-size: 17px; }
+.badge { display: inline-block; font-family: var(--f-mono); font-size: 11px; padding: 2px 8px; border: 1px solid var(--line); border-radius: 6px; color: var(--muted); }
+header { display: flex; flex-direction: column; gap: 14px; }
+
+.bar { display: flex; flex-wrap: wrap; gap: 10px; align-items: center; padding: 12px; border: 1px solid var(--line); border-radius: 14px; background: var(--card); }
+.bar .sp { flex: 1; }
+.btn {
+  font: 500 14px var(--f-body); color: var(--fg); background: transparent; border: 1px solid var(--line);
+  border-radius: 999px; padding: 8px 16px; cursor: pointer; min-height: 40px;
+}
+.btn[aria-pressed="true"] { background: rgb(var(--orb-rgb) / .16); border-color: rgb(var(--orb-rgb) / .55); }
+.btn:focus-visible, .dockbtn:focus-visible { outline: 2px solid rgb(var(--orb-rgb)); outline-offset: 2px; }
+
+.options { display: grid; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); gap: 40px 28px; }
+.opt { display: flex; flex-direction: column; gap: 18px; min-width: 0; }
+.opt header { gap: 6px; }
+.opt h2 span { color: rgb(var(--orb-rgb)); }
+
+.phone {
+  position: relative; width: 320px; max-width: 100%; height: 640px; margin: 0 auto;
+  border-radius: 46px; border: 1px solid var(--line); background: var(--screen); overflow: hidden;
+  box-shadow: 0 1px 0 var(--line), 0 24px 48px -28px rgb(0 0 0 / .35);
+}
+.phone canvas { position: absolute; left: 50%; transform: translateX(-50%); pointer-events: none; }
+.status { position: absolute; top: 18px; left: 0; right: 0; display: flex; justify-content: center; height: 24px; color: var(--muted); }
+.status svg { width: 18px; height: 18px; opacity: 0; transition: opacity .3s; }
+.offline .status svg { opacity: 1; }
+.offline canvas { opacity: .35; }
+.hint { position: absolute; left: 24px; right: 24px; top: 46px; text-align: center; font-size: 12px; color: var(--muted); opacity: 0; transition: opacity .3s; }
+.offline .hint { opacity: 1; }
+
+/* A: orb above, captions scroll underneath */
+.a canvas { top: 62px; }
+.a .cap { position: absolute; left: 28px; right: 28px; top: 292px; bottom: 84px; display: flex; align-items: flex-end;
+  -webkit-mask-image: linear-gradient(to bottom, transparent 0, #000 38%); mask-image: linear-gradient(to bottom, transparent 0, #000 38%); }
+.a .cap p { font-family: var(--f-display); font-size: 25px; line-height: 1.22; max-width: none; }
+.a .w { opacity: .42; transition: opacity .4s; }
+.a .w.now { opacity: 1; }
+
+/* B: big orb, the phrase sits inside it */
+.b canvas { top: 120px; }
+.b .cap { position: absolute; left: 62px; right: 62px; top: 120px; height: 296px; display: grid; place-items: center; text-align: center; }
+.b .cap p { font-family: var(--f-display); font-size: 27px; line-height: 1.15; text-wrap: balance; }
+.b .scrim { position: absolute; left: 50%; top: 120px; width: 296px; height: 296px; transform: translateX(-50%); border-radius: 50%;
+  background: radial-gradient(closest-side, var(--screen) 0, rgb(0 0 0 / 0) 100%); opacity: .78; pointer-events: none; }
+.b .w { opacity: .55; }
+.b .w.now { opacity: 1; }
+
+/* C: ambient field, small orb, subtitle above the dock */
+.c .field { position: absolute; left: 50%; top: 220px; width: 520px; height: 520px; margin: -260px 0 0 -260px; border-radius: 50%;
+  background: radial-gradient(closest-side, rgb(var(--orb-rgb) / .34), rgb(var(--orb-rgb) / 0)); transform: scale(var(--s, 1)); opacity: var(--o, .5); }
+.c canvas { top: 120px; }
+.c .cap { position: absolute; left: 30px; right: 30px; bottom: 96px; height: 76px; display: flex; align-items: flex-end; justify-content: center; text-align: center; }
+.c .cap p { font-family: var(--f-body); font-weight: 500; font-size: 19px; line-height: 1.3; text-wrap: balance; }
+.c .w { opacity: .6; }
+.c .w.now { opacity: 1; }
+
+.fade-in { animation: fadein .35s ease both; }
+.rm .fade-in { animation: none; }
+.rm .w { transition: none; }
+@keyframes fadein { from { opacity: 0; transform: translateY(4px); } to { opacity: 1; transform: none; } }
+
+/* The dock stays 64 pt. Placeholder contents, the real dock is not changed by this study. */
+.dock { position: absolute; left: 14px; right: 14px; bottom: 14px; height: 64px; border-radius: 32px;
+  border: 1px solid var(--line); background: rgb(var(--orb-rgb) / .05); display: flex; align-items: center; justify-content: space-between; padding: 0 14px; }
+.dockbtn { width: 44px; height: 44px; border-radius: 50%; border: 1px solid transparent; background: transparent; color: var(--muted); display: grid; place-items: center; cursor: pointer; }
+.dockbtn.main { width: 48px; height: 48px; color: rgb(var(--orb-rgb)); background: rgb(var(--orb-rgb) / .16); border-color: rgb(var(--orb-rgb) / .5); }
+.dockbtn svg { width: 22px; height: 22px; }
+
+dl.spec { display: grid; grid-template-columns: 92px 1fr; gap: 10px 14px; margin: 0; font-size: 14px; }
+dl.spec dt { font-family: var(--f-mono); font-size: 11px; letter-spacing: .06em; text-transform: uppercase; color: var(--muted); padding-top: 3px; }
+dl.spec dd { margin: 0; min-width: 0; }
+
+.tablewrap { overflow-x: auto; border: 1px solid var(--line); border-radius: 14px; background: var(--card); }
+table { border-collapse: collapse; width: 100%; min-width: 640px; font-size: 14px; }
+th, td { text-align: left; padding: 10px 14px; border-bottom: 1px solid var(--line); vertical-align: top; }
+th { font-family: var(--f-mono); font-size: 11px; letter-spacing: .06em; text-transform: uppercase; color: var(--muted); font-weight: 500; }
+tr:last-child td { border-bottom: 0; }
+td.y { color: var(--ok); font-weight: 600; }
+.two { display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap: 28px; }
+.two > div { display: flex; flex-direction: column; gap: 10px; min-width: 0; }
+ul { margin: 0; padding-left: 18px; display: flex; flex-direction: column; gap: 6px; max-width: 65ch; }
+</style>
+
+<div class="wrap">
+  <header>
+    <div class="eyebrow">Thames · Speaking screen study <span class="badge">[Not built]</span></div>
+    <h1>When Thames talks, it gets its own orb</h1>
+    <p class="lede">Today the reply reads like any chat thread. These three options give the voice a centre of gravity: an orb that moves with the speech and captions that appear as each word is spoken. All three play the same reply, so you can compare them directly.</p>
+  </header>
+
+  <div class="bar" role="group" aria-label="Playback">
+    <button class="btn" id="play" type="button" aria-pressed="true">Pause</button>
+    <button class="btn" id="replay" type="button">Replay</button>
+    <span class="sp"></span>
+    <button class="btn" id="rm" type="button" aria-pressed="false">Reduce Motion</button>
+    <button class="btn" id="off" type="button" aria-pressed="false">No service</button>
+  </div>
+
+  <section class="options" aria-label="Three options">
+    <article class="opt">
+      <header>
+        <div class="eyebrow">Option A</div>
+        <h2><span>Stage.</span> Orb on top, captions beneath</h2>
+        <p>The orb sits in the upper middle. Words appear below it as they are spoken and the older ones dim and drift up, so you can glance back at what was just said.</p>
+      </header>
+      <div class="phone a" data-opt="a">
+        <div class="status"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M2 8.8a15 15 0 0 1 20 0M5 12.5a10 10 0 0 1 8-2.8M8.5 16a5 5 0 0 1 3-1.3M12 19.5h.01M3 3l18 18"/></svg></div>
+        <div class="hint">Waiting for a connection</div>
+        <canvas></canvas>
+        <div class="cap" aria-live="polite"><p></p></div>
+        <div class="dock"></div>
+      </div>
+      <dl class="spec">
+        <dt>Motion</dt><dd>Dots swell with the voice and breathe in the pauses between sentences. New words fade in over 0.35 s; older words settle to 42% opacity.</dd>
+        <dt>Haptics</dt><dd>One soft tick when the first word lands. Nothing per word, it would buzz. A light tap on stop.</dd>
+        <dt>Reduce Motion</dt><dd>The sphere stops turning and does not swell. Loudness shows as brightness. Words appear without fading.</dd>
+        <dt>No service</dt><dd>Orb dims, a small wifi-off icon and one quiet line. Captions already received stay.</dd>
+        <dt>Trade-off</dt><dd>Closest to what was asked. The orb is smaller than in B, but you keep a readable transcript.</dd>
+      </dl>
+    </article>
+
+    <article class="opt">
+      <header>
+        <div class="eyebrow">Option B</div>
+        <h2><span>Lantern.</span> Captions live inside the orb</h2>
+        <p>One big orb fills the middle and the current phrase is set inside it, one phrase at a time. When the phrase ends, the next replaces it.</p>
+      </header>
+      <div class="phone b" data-opt="b">
+        <div class="status"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M2 8.8a15 15 0 0 1 20 0M5 12.5a10 10 0 0 1 8-2.8M8.5 16a5 5 0 0 1 3-1.3M12 19.5h.01M3 3l18 18"/></svg></div>
+        <div class="hint">Waiting for a connection</div>
+        <canvas></canvas>
+        <div class="scrim"></div>
+        <div class="cap" aria-live="polite"><p></p></div>
+        <div class="dock"></div>
+      </div>
+      <dl class="spec">
+        <dt>Motion</dt><dd>The orb is the whole screen, so it moves more gently. Phrases cross-fade; the active word is full strength.</dd>
+        <dt>Haptics</dt><dd>One soft tick at the first word. A very light tick on each new phrase would be possible; held back until tried on the phone.</dd>
+        <dt>Reduce Motion</dt><dd>Static sphere that brightens with the voice. Phrases swap without a fade.</dd>
+        <dt>No service</dt><dd>Orb dims, the current phrase stays in place.</dd>
+        <dt>Trade-off</dt><dd>Strongest identity, but the text sits on the dots, so contrast needs care. No history on screen; it needs a way to scroll back.</dd>
+      </dl>
+    </article>
+
+    <article class="opt">
+      <header>
+        <div class="eyebrow">Option C</div>
+        <h2><span>Subtitle.</span> A glow with film-style captions</h2>
+        <p>A smaller orb sits in a soft field of light that pulses with the voice. Captions run as two-line subtitles just above the dock.</p>
+      </header>
+      <div class="phone c" data-opt="c">
+        <div class="field"></div>
+        <div class="status"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M2 8.8a15 15 0 0 1 20 0M5 12.5a10 10 0 0 1 8-2.8M8.5 16a5 5 0 0 1 3-1.3M12 19.5h.01M3 3l18 18"/></svg></div>
+        <div class="hint">Waiting for a connection</div>
+        <canvas></canvas>
+        <div class="cap" aria-live="polite"><p></p></div>
+        <div class="dock"></div>
+      </div>
+      <dl class="spec">
+        <dt>Motion</dt><dd>The field behind the orb scales 1.0 to 1.12 with loudness. Subtitles replace each other every phrase, never more than six words.</dd>
+        <dt>Haptics</dt><dd>One soft tick at the first word. A light tap on stop.</dd>
+        <dt>Reduce Motion</dt><dd>The field holds still and only changes brightness.</dd>
+        <dt>No service</dt><dd>Field fades out, the subtitle stays.</dd>
+        <dt>Trade-off</dt><dd>Easiest to read and the least intrusive. The orb is the smallest of the three, so it feels the least like a character.</dd>
+      </dl>
+    </article>
+  </section>
+
+  <section class="two">
+    <div>
+      <h2>Checked against the principles</h2>
+      <div class="tablewrap">
+        <table>
+          <thead><tr><th>Constraint</th><th>A</th><th>B</th><th>C</th></tr></thead>
+          <tbody>
+            <tr><td>Dock stays 64 pt</td><td class="y">Yes</td><td class="y">Yes</td><td class="y">Yes</td></tr>
+            <tr><td>No red on the quiet dock</td><td class="y">Yes</td><td class="y">Yes</td><td class="y">Yes</td></tr>
+            <tr><td>Person starts and ends turns</td><td class="y">Yes</td><td class="y">Yes</td><td class="y">Yes</td></tr>
+            <tr><td>Icons over words</td><td class="y">Yes</td><td class="y">Yes</td><td class="y">Yes</td></tr>
+            <tr><td>Works without service</td><td class="y">Yes</td><td class="y">Yes</td><td class="y">Yes</td></tr>
+            <tr><td>Reduce Motion version</td><td class="y">Yes</td><td class="y">Yes</td><td class="y">Yes</td></tr>
+          </tbody>
+        </table>
+      </div>
+      <p class="lede" style="font-size:14px">Nothing starts by itself. After the reply ends the orb settles and the dock offers the mic, it never starts listening on its own. The stop button in the dock ends the reply early.</p>
+    </div>
+    <div>
+      <h2>My pick</h2>
+      <p><strong>Option A.</strong> It is the closest to what you described, and it is the only one that keeps a readable trail of what was said. That matters when someone looks away and wants to catch up.</p>
+      <p>I would steal one idea from C: the soft field behind the orb, so A's orb feels bigger without taking more room.</p>
+      <h2 style="margin-top:12px">Still open</h2>
+      <ul>
+        <li>How does the agent's orb differ from your listening orb? A different tint, a different dot density, or a solid core with a ring of dots.</li>
+        <li>Does it keep the five-segment stage ring, or does the orb alone say "speaking"?</li>
+        <li>Should captions be on by default, or follow the voice setting?</li>
+      </ul>
+      <p class="eyebrow" style="margin-top:6px">Next: the motion lab, then code.</p>
+    </div>
+  </section>
+</div>
+
+<script>
+(function () {
+  var SCRIPT = "Sure. The Thames Barrier closes when a tidal surge is forecast, so London stays dry. It is tested every month, usually around low tide. If you like, I can set a reminder before the next test.";
+  var ICON = {
+    stop: '<svg viewBox="0 0 24 24" fill="currentColor"><rect x="6" y="6" width="12" height="12" rx="3"/></svg>',
+    mic: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="9" y="3" width="6" height="11" rx="3"/><path d="M5 11a7 7 0 0 0 14 0M12 18v3"/></svg>',
+    clock: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/></svg>',
+    kbd: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="6" width="18" height="12" rx="3"/><path d="M7 10h.01M11 10h.01M15 10h.01M8 14h8"/></svg>'
+  };
+
+  /* Words with start times, so captions arrive as they are spoken. */
+  var words = SCRIPT.split(/\s+/).map(function (t) {
+    return { t: t, sentence: /[.!?]$/.test(t), clause: /[,;:]$/.test(t) };
+  });
+  var chunk = 0, inChunk = 0, clock = 0.4;
+  words.forEach(function (w) {
+    w.chunk = chunk; w.i = inChunk; w.start = clock;
+    var dur = 0.2 + 0.028 * w.t.length;
+    w.end = clock + dur;
+    clock += dur + (w.sentence ? 0.55 : w.clause ? 0.28 : 0.02);
+    inChunk++;
+    if (w.sentence || w.clause || inChunk >= 6) { chunk++; inChunk = 0; }
+  });
+  var TOTAL = words[words.length - 1].end;
+  var chunks = [];
+  words.forEach(function (w) { (chunks[w.chunk] = chunks[w.chunk] || []).push(w); });
+
+  var state = { time: 0, playing: true, stopped: false, reduce: false, offline: false, amp: 0 };
+  try { state.reduce = window.matchMedia('(prefers-reduced-motion: reduce)').matches; } catch (e) {}
+
+  var phones = Array.prototype.map.call(document.querySelectorAll('.phone'), function (el) {
+    var canvas = el.querySelector('canvas');
+    var size = el.dataset.opt === 'a' ? 190 : el.dataset.opt === 'b' ? 296 : 190;
+    var dpr = Math.min(window.devicePixelRatio || 1, 2);
+    canvas.width = size * dpr; canvas.height = size * dpr;
+    canvas.style.width = size + 'px'; canvas.style.height = size + 'px';
+    var dock = el.querySelector('.dock');
+    dock.innerHTML = '<button class="dockbtn" type="button" aria-label="History">' + ICON.clock + '</button>' +
+      '<button class="dockbtn main" type="button" aria-label="Stop"></button>' +
+      '<button class="dockbtn" type="button" aria-label="Type instead">' + ICON.kbd + '</button>';
+    var main = dock.querySelector('.main');
+    main.addEventListener('click', function () {
+      if (state.stopped || state.time >= TOTAL) { restart(); } else { state.stopped = true; }
+    });
+    var pts = [], N = el.dataset.opt === 'b' ? 520 : 380, ga = Math.PI * (3 - Math.sqrt(5));
+    for (var k = 0; k < N; k++) {
+      var y = 1 - (k / (N - 1)) * 2, r = Math.sqrt(1 - y * y), th = k * ga;
+      pts.push([Math.cos(th) * r, y, Math.sin(th) * r, k]);
+    }
+    return { el: el, opt: el.dataset.opt, canvas: canvas, ctx: canvas.getContext('2d'), size: size, dpr: dpr,
+      cap: el.querySelector('.cap p'), field: el.querySelector('.field'), main: main, pts: pts,
+      shown: -1, shownChunk: -1, mode: '' };
+  });
+
+  function restart() { state.time = 0; state.stopped = false; state.playing = true; syncPlay(); phones.forEach(function (p) { p.shown = -1; p.shownChunk = -1; p.cap.innerHTML = ''; }); }
+  function currentIndex() {
+    var idx = -1;
+    for (var i = 0; i < words.length; i++) { if (words[i].start <= state.time) idx = i; }
+    return idx;
+  }
+  function speaking(idx) {
+    if (idx < 0 || state.stopped || state.time > TOTAL) return false;
+    return state.time <= words[idx].end;
+  }
+
+  function span(w, now) {
+    return '<span class="w' + (now ? ' now' : '') + '">' + w.t + '</span> ';
+  }
+  function renderA(p, idx) {
+    if (idx === p.shown) return;
+    if (idx < p.shown || idx < 0) { p.cap.innerHTML = ''; p.shown = -1; }
+    var olds = p.cap.querySelectorAll('.now');
+    for (var j = 0; j < olds.length; j++) olds[j].classList.remove('now');
+    for (var i = p.shown + 1; i <= idx; i++) {
+      var s = document.createElement('span'); s.className = 'w' + (i === idx ? ' now' : ''); s.textContent = words[i].t + ' ';
+      p.cap.appendChild(s);
+    }
+    var last = p.cap.lastElementChild; if (last) last.classList.add('now');
+    p.shown = idx;
+  }
+  function renderChunk(p, idx) {
+    if (idx === p.shown) return;
+    p.shown = idx;
+    if (idx < 0) { p.cap.innerHTML = ''; p.shownChunk = -1; return; }
+    var c = words[idx].chunk, html = '';
+    chunks[c].forEach(function (w) { if (w.i <= words[idx].i) html += span(w, w.i === words[idx].i); });
+    p.cap.innerHTML = html;
+    if (p.shownChunk !== c) { p.cap.classList.remove('fade-in'); void p.cap.offsetWidth; p.cap.classList.add('fade-in'); p.shownChunk = c; }
+  }
+
+  var cs = null;
+  function rgb() {
+    if (!cs) cs = getComputedStyle(document.documentElement);
+    return cs.getPropertyValue('--orb-rgb').trim().split(/\s+/);
+  }
+
+  function drawOrb(p, t) {
+    var ctx = p.ctx, S = p.size * p.dpr, R = S * (p.opt === 'b' ? 0.36 : 0.34), c = rgb();
+    ctx.clearRect(0, 0, S, S);
+    var a = state.amp, rm = state.reduce;
+    var g = ctx.createRadialGradient(S / 2, S / 2, 0, S / 2, S / 2, R * 1.5);
+    g.addColorStop(0, 'rgba(' + c[0] + ',' + c[1] + ',' + c[2] + ',' + (0.1 + a * 0.18) + ')');
+    g.addColorStop(1, 'rgba(' + c[0] + ',' + c[1] + ',' + c[2] + ',0)');
+    ctx.fillStyle = g; ctx.fillRect(0, 0, S, S);
+    var rot = rm ? 0.6 : t * 0.35, cr = Math.cos(rot), sr = Math.sin(rot), tilt = 0.35, ct = Math.cos(tilt), st = Math.sin(tilt);
+    var bright = rm ? 0.55 + a * 0.45 : 1;
+    for (var i = 0; i < p.pts.length; i++) {
+      var q = p.pts[i], x = q[0] * cr + q[2] * sr, z = -q[0] * sr + q[2] * cr, y = q[1] * ct - z * st; z = q[1] * st + z * ct;
+      var wob = rm ? 0 : Math.sin(q[3] * 12.9898 + t * 6) * a * 0.1 + Math.sin(q[1] * 5 + t * 2.4) * a * 0.12;
+      var rr = R * (1 + (rm ? 0 : a * 0.1) + wob);
+      var depth = (z + 1) / 2, rad = (0.7 + depth * 1.2) * p.dpr * (p.opt === 'b' ? 1.15 : 1);
+      ctx.fillStyle = 'rgba(' + c[0] + ',' + c[1] + ',' + c[2] + ',' + ((0.2 + depth * 0.75) * bright) + ')';
+      ctx.beginPath(); ctx.arc(S / 2 + x * rr, S / 2 + y * rr, rad, 0, 6.2832); ctx.fill();
+    }
+  }
+
+  var last = performance.now(), hold = 0;
+  function frame(now) {
+    var dt = Math.min((now - last) / 1000, 0.1); last = now;
+    if (state.playing && !state.stopped && !state.offline) {
+      if (state.time < TOTAL) state.time += dt;
+      else { hold += dt; if (hold > 3) { hold = 0; restart(); } }
+    }
+    var idx = currentIndex(), live = speaking(idx) && !state.offline;
+    var target = 0.04;
+    if (live) target = 0.3 + 0.6 * Math.abs(Math.sin(now / 90) * Math.sin(now / 230 + 1.3));
+    else if (state.offline) target = 0;
+    state.amp += (target - state.amp) * Math.min(1, dt * 12);
+
+    phones.forEach(function (p) {
+      p.el.classList.toggle('offline', state.offline);
+      p.el.classList.toggle('rm', state.reduce);
+      if (p.opt === 'a') renderA(p, idx); else renderChunk(p, idx);
+      var wantMic = state.stopped || state.time >= TOTAL;
+      var mode = wantMic ? 'mic' : 'stop';
+      if (p.mode !== mode) { p.mode = mode; p.main.innerHTML = ICON[mode]; p.main.setAttribute('aria-label', wantMic ? 'Start listening' : 'Stop'); }
+      drawOrb(p, now / 1000);
+      if (p.field) {
+        p.field.style.setProperty('--s', state.reduce ? 1 : (1 + state.amp * 0.12).toFixed(3));
+        p.field.style.setProperty('--o', state.offline ? 0 : (0.35 + state.amp * 0.65).toFixed(3));
+      }
+    });
+    requestAnimationFrame(frame);
+  }
+
+  var playBtn = document.getElementById('play'), rmBtn = document.getElementById('rm'), offBtn = document.getElementById('off');
+  function syncPlay() { playBtn.setAttribute('aria-pressed', String(state.playing)); playBtn.textContent = state.playing ? 'Pause' : 'Play'; }
+  playBtn.addEventListener('click', function () { state.playing = !state.playing; syncPlay(); });
+  document.getElementById('replay').addEventListener('click', restart);
+  function syncRm() { rmBtn.setAttribute('aria-pressed', String(state.reduce)); }
+  rmBtn.addEventListener('click', function () { state.reduce = !state.reduce; syncRm(); });
+  offBtn.addEventListener('click', function () { state.offline = !state.offline; offBtn.setAttribute('aria-pressed', String(state.offline)); });
+  syncRm(); syncPlay();
+  requestAnimationFrame(frame);
+})();
+</script>
