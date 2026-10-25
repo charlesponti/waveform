@@ -25,6 +25,23 @@ import Testing
     #expect(out.map(\.low) == [0, 0, 1, 2])
   }
 
+  /// A new take must not open on the last one's tail.
+  @Test func clearingForgetsTheLastTake() {
+    let ring = ColumnRing(capacity: 16)
+    for i in 1...5 { ring.append(column(i)) }
+    #expect(ring.count == 5)
+    ring.clear()
+    #expect(ring.count == 0)
+    var out = [Column](repeating: column(9), count: 3)
+    let real = out.withUnsafeMutableBufferPointer { ring.copyLast(3, into: $0.baseAddress!) }
+    #expect(real == 0)
+    #expect(out.map(\.low) == [0, 0, 0])
+    // and it takes new data again from the start of the buffer, not from where the last take stopped
+    ring.append(column(42))
+    #expect(out.withUnsafeMutableBufferPointer { ring.copyLast(1, into: $0.baseAddress!) } == 1)
+    #expect(out[0].low == 42)
+  }
+
   /// A writer on another thread racing a reader: every copy must be a run of consecutive columns,
   /// never a torn mix of old and new.
   @Test func aReaderRacingAWriterNeverSeesATornRun() async {

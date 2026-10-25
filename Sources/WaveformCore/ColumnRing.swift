@@ -59,6 +59,16 @@ public final class ColumnRing: @unchecked Sendable {
     return (real, end)
   }
 
+  /// Forgets everything written, so a new take does not open on the last one's tail.
+  ///
+  /// Zeroes the slots before publishing the reset, so a reader that arrives mid-clear sees either the old
+  /// columns or an empty ring, never a half-zeroed one. Called between takes, not from the audio thread
+  /// while the same take is being drawn.
+  public func clear() {
+    slots.update(repeating: .silent, count: capacity)
+    written.store(0, ordering: .releasing)
+  }
+
   /// The same, returning only how many are real.
   @discardableResult
   public func copyLast(_ n: Int, into out: UnsafeMutablePointer<Column>) -> Int {

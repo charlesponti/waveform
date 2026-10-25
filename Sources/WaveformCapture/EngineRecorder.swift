@@ -105,6 +105,11 @@
       }
       lock.unlock()
 
+      // A new take opens on silence. Thames cleared its rings per recording before this existed; without it
+      // the orb spends the first second drawing the previous take's tail.
+      columns.clear()
+      spectrum?.clear()
+
       try source.start { [weak self] buffer, when in
         self?.take(buffer, at: when)
       }

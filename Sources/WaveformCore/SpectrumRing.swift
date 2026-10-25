@@ -25,6 +25,12 @@ public final class SpectrumRing: @unchecked Sendable {
 
   public var count: Int { written.load(ordering: .acquiring) }
 
+  /// Forgets everything written; the same contract as `ColumnRing.clear()`.
+  public func clear() {
+    slots.update(repeating: 0, count: capacity * bands)
+    written.store(0, ordering: .releasing)
+  }
+
   /// Called by the one writer: `values` holds `bands` numbers.
   public func append(_ values: UnsafeBufferPointer<Float>) {
     let index = written.load(ordering: .relaxed)
