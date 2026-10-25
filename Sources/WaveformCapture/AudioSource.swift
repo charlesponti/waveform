@@ -89,8 +89,6 @@
     private var output: AVCaptureAudioDataOutput?
     private var sink: Sink?
     private let delegateQueue = DispatchQueue(label: "capture-source")
-    /// The format the sample buffers arrive in, so the recorder knows what it converting from.
-    private(set) var bufferFormat: AVAudioFormat?
 
     public init(deviceUID: String?, settings: CaptureSettings) {
       self.uid = deviceUID
@@ -111,25 +109,25 @@
       session.addInput(input)
 
       let dataOutput = AVCaptureAudioDataOutput()
-      // Exactly the file's format: no converter of our own, and no resampling.
-      dataOutput.audioSettings = [
-        AVFormatIDKey: Int(kAudioFormatLinearPCM),
-        AVSampleRateKey: settings.sampleRate,
-        AVNumberOfChannelsKey: settings.channels,
-        AVLinearPCMBitDepthKey: 16,
-        AVLinearPCMIsFloatKey: false,
-        AVLinearPCMIsBigEndianKey: false,
-        AVLinearPCMIsNonInterleaved: false,
-      ]
+      #if os(macOS)
+        // macOS lets the output be asked for a format: exactly the file's, so no resampling. iOS has no
+        // `audioSettings` at all — it always delivers Float32 — which is why the sink below reads the format
+        // off the sample buffer instead of trusting this one.
+        dataOutput.audioSettings = [
+          AVFormatIDKey: Int(kAudioFormatLinearPCM),
+          AVSampleRateKey: settings.sampleRate,
+          AVNumberOfChannelsKey: settings.channels,
+          AVLinearPCMBitDepthKey: 16,
+          AVLinearPCMIsFloatKey: false,
+          AVLinearPCMIsBigEndianKey: false,
+          AVLinearPCMIsNonInterleaved: false,
+        ]
+      #endif
       guard session.canAddOutput(dataOutput) else { throw CaptureSourceError.outputRefused }
       session.addOutput(dataOutput)
 
-      let format = AVAudioFormat(standardFormatWithSampleRate: settings.sampleRate,
-                                 channels: AVAudioChannelCount(settings.channels))
-      bufferFormat = format
-
       // The output holds its delegate weakly: an inline sink would be deallocated before the first buffer.
-      let sink = Sink(format: format, onBuffer: onBuffer)
+      let sink = Sink(onBuffer: onBuffer)
       dataOutput.setSampleBufferDelegate(sink, queue: delegateQueue)
       self.sink = sink
       self.output = dataOutput
@@ -155,19 +153,23 @@
       return AVCaptureDevice.default(for: .audio)
     }
 
-    /// Turns 16-bit sample buffers into the Float32 buffers the recorder converts from.
+    /// Turns the output's sample buffers into the Float32 buffers the recorder converts from.
+    ///
+    /// The format is read from each sample buffer rather than assumed: macOS delivers the 16-bit interleaved
+    /// shape asked for above, iOS delivers Float32 and cannot be asked for anything.
     private final class Sink: NSObject, AVCaptureAudioDataOutputSampleBufferDelegate {
-      private let format: AVAudioFormat?
       private let onBuffer: (AVAudioPCMBuffer, AVAudioTime) -> Void
 
-      init(format: AVAudioFormat?, onBuffer: @escaping (AVAudioPCMBuffer, AVAudioTime) -> Void) {
-        self.format = format
+      init(onBuffer: @escaping (AVAudioPCMBuffer, AVAudioTime) -> Void) {
         self.onBuffer = onBuffer
       }
 
       func captureOutput(_ output: AVCaptureOutput, didOutput sampleBuffer: CMSampleBuffer,
                          from connection: AVCaptureConnection) {
-        guard let format, let block = CMSampleBufferGetDataBuffer(sampleBuffer),
+        guard let description = CMSampleBufferGetFormatDescription(sampleBuffer),
+              let asbd = CMAudioFormatDescriptionGetStreamBasicDescription(description),
+              let format = AVAudioFormat(streamDescription: asbd),
+              let block = CMSampleBufferGetDataBuffer(sampleBuffer),
               CMBlockBufferIsRangeContiguous(block, atOffset: 0, length: 0) else { return }
         var lengthAtOffset = 0
         var totalLength = 0
@@ -176,15 +178,38 @@
                                           totalLengthOut: &totalLength, dataPointerOut: &pointer) == kCMBlockBufferNoErr,
               let pointer else { return }
 
-        let sampleCount = totalLength / MemoryLayout<Int16>.size
-        guard sampleCount > 0,
-              let pcm = AVAudioPCMBuffer(pcmFormat: format, frameCapacity: AVAudioFrameCount(sampleCount)),
-              let destination = pcm.floatChannelData?[0] else { return }
-        pcm.frameLength = AVAudioFrameCount(sampleCount)
-        pointer.withMemoryRebound(to: Int16.self, capacity: sampleCount) { source in
-          for index in 0..<sampleCount { destination[index] = Float(source[index]) / 32_768 }
+        // Every buffer handed on is Float32 mono at the source's own rate; the recorder converts from there.
+        let channels = max(1, Int(format.channelCount))
+        let target = AVAudioFormat(standardFormatWithSampleRate: format.sampleRate, channels: 1)!
+        switch format.commonFormat {
+        case .pcmFormatFloat32:
+          let frames = totalLength / (MemoryLayout<Float>.size * channels)
+          guard frames > 0,
+                let pcm = AVAudioPCMBuffer(pcmFormat: target, frameCapacity: AVAudioFrameCount(frames)),
+                let destination = pcm.floatChannelData?[0] else { return }
+          pcm.frameLength = AVAudioFrameCount(frames)
+          pointer.withMemoryRebound(to: Float.self, capacity: frames * channels) { source in
+            // Interleaved or not, take the first channel: a microphone is one channel in practice.
+            if format.isInterleaved {
+              for frame in 0..<frames { destination[frame] = source[frame * channels] }
+            } else {
+              destination.update(from: source, count: frames)
+            }
+          }
+          onBuffer(pcm, AVAudioTime(hostTime: mach_absolute_time()))
+        case .pcmFormatInt16:
+          let frames = totalLength / (MemoryLayout<Int16>.size * channels)
+          guard frames > 0,
+                let pcm = AVAudioPCMBuffer(pcmFormat: target, frameCapacity: AVAudioFrameCount(frames)),
+                let destination = pcm.floatChannelData?[0] else { return }
+          pcm.frameLength = AVAudioFrameCount(frames)
+          pointer.withMemoryRebound(to: Int16.self, capacity: frames * channels) { source in
+            for frame in 0..<frames { destination[frame] = Float(source[frame * channels]) / 32_768 }
+          }
+          onBuffer(pcm, AVAudioTime(hostTime: mach_absolute_time()))
+        default:
+          return
         }
-        onBuffer(pcm, AVAudioTime(hostTime: mach_absolute_time()))
       }
     }
   }
