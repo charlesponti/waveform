@@ -1,0 +1,136 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Orb Lab — Tune the Voice Orb</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+<style>
+  :root{--bg:#f6f7f9;--fg:#0b0d12;--muted:#5b6478;--accent:#16c784;--line:#e3e6ee;--card:#fff}
+  *{box-sizing:border-box;margin:0;padding:0}
+  body{font-family:'Inter',system-ui,sans-serif;background:var(--bg);color:var(--fg);padding:40px 20px}
+  .wrap{max-width:1100px;margin:0 auto;display:grid;grid-template-columns:1fr 360px;gap:40px;align-items:start}
+  h1{font-size:32px;font-weight:700;margin-bottom:6px}
+  .sub{color:var(--muted);margin-bottom:24px}
+  .orb-box{background:#0a0e16;border-radius:24px;padding:20px;box-shadow:0 20px 60px rgba(0,0,0,.12);display:grid;place-items:center}
+  .panel{background:var(--card);border:1px solid var(--line);border-radius:20px;padding:24px;box-shadow:0 12px 40px rgba(15,20,40,.08)}
+  .panel h3{font-size:13px;text-transform:uppercase;letter-spacing:.1em;color:var(--muted);margin:18px 0 8px}
+  .panel h3:first-child{margin-top:0}
+  .row{display:flex;align-items:center;gap:12px;margin-bottom:10px}
+  .row label{width:90px;font-size:13px;font-weight:500}
+  .row input[type=range]{flex:1}
+  .row .val{width:52px;text-align:right;font-family:'JetBrains Mono',monospace;font-size:12px;color:var(--muted)}
+  select{width:100%;padding:8px;border-radius:8px;border:1px solid var(--line);font-family:inherit}
+  .moods{display:flex;gap:8px;margin-bottom:16px;flex-wrap:wrap}
+  .moods button{padding:8px 14px;border-radius:10px;border:1px solid var(--line);background:#fff;cursor:pointer;font-weight:500}
+  .moods button.active{background:var(--accent);color:#fff;border-color:var(--accent)}
+  .code{margin-top:16px;padding:12px;background:#0a0e16;color:#3cffb5;border-radius:10px;font-family:'JetBrains Mono',monospace;font-size:12px;white-space:pre-wrap;word-break:break-all}
+  @media(max-width:760px){.wrap{grid-template-columns:1fr}}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <div>
+    <h1>Orb Lab</h1>
+    <p class="sub">Tune every parameter of the voice orb live. Changes apply instantly.</p>
+    <div class="orb-box">
+      <voice-orb id="orb" mood="listening" style="width:360px;height:360px"></voice-orb>
+    </div>
+    <div class="code" id="code"></div>
+  </div>
+  <div class="panel">
+    <h3>Mood preset</h3>
+    <div class="moods">
+      <button data-mood="listening" class="active">Listening</button>
+      <button data-mood="done">Done</button>
+      <button data-mood="error">Error</button>
+      <button data-mood="neutral">Neutral</button>
+    </div>
+    <h3>Parameters</h3>
+    <div class="row"><label>Dots</label><input type="range" id="dots" min="200" max="4000" step="100" value="1400"><span class="val" id="v-dots">1400</span></div>
+    <div class="row"><label>Hue</label><input type="range" id="hue" min="0" max="360" step="1" value="172"><span class="val" id="v-hue">172</span></div>
+    <div class="row"><label>Spin</label><input type="range" id="spin" min="0" max="1" step="0.01" value="0.35"><span class="val" id="v-spin">0.35</span></div>
+    <div class="row"><label>Gain</label><input type="range" id="gain" min="0" max="1.5" step="0.01" value="0.75"><span class="val" id="v-gain">0.75</span></div>
+    <div class="row"><label>Wrap</label><input type="range" id="wrap" min="0" max="1" step="0.01" value="1"><span class="val" id="v-wrap">1.00</span></div>
+    <div class="row"><label>History</label><input type="range" id="history" min="0.2" max="2" step="0.1" value="0.8"><span class="val" id="v-history">0.8</span></div>
+    <div class="row"><label>Pulse</label><input type="range" id="pulse" min="0" max="1" step="1" value="0"><span class="val" id="v-pulse">0</span></div>
+    <h3>Color by</h3>
+    <select id="colorby">
+      <option value="none">none (hue)</option>
+      <option value="age">age</option>
+      <option value="pitch">pitch</option>
+    </select>
+    <h3>Mood (overrides above)</h3>
+    <select id="moodselect">
+      <option value="listening">listening</option>
+      <option value="done">done</option>
+      <option value="error">error</option>
+      <option value="neutral">neutral</option>
+    </select>
+  </div>
+</div>
+<script src="voice-orb.js" type="module"></script>
+<script>
+const orb = document.getElementById('orb');
+const code = document.getElementById('code');
+
+function updateCode() {
+  const attrs = ['mood','dots','hue','spin','gain','wrap','history','pulse','colorby']
+    .map(a => {
+      const v = orb.getAttribute(a);
+      if (v === null) return '';
+      return `${a}="${v}"`;
+    }).filter(Boolean).join(' ');
+  code.textContent = `<voice-orb ${attrs}></voice-orb>`;
+}
+
+function bind(id, attr, fmt) {
+  const el = document.getElementById(id);
+  const val = document.getElementById('v-'+id);
+  el.addEventListener('input', () => {
+    const v = el.value;
+    orb.setAttribute(attr, v);
+    if (val) val.textContent = fmt ? fmt(v) : v;
+    // clear mood preset highlight since manual
+    updateCode();
+  });
+}
+bind('dots','dots');
+bind('hue','hue');
+bind('spin','spin', v=>parseFloat(v).toFixed(2));
+bind('gain','gain', v=>parseFloat(v).toFixed(2));
+bind('wrap','wrap', v=>parseFloat(v).toFixed(2));
+bind('history','history', v=>parseFloat(v).toFixed(1));
+bind('pulse','pulse');
+
+document.getElementById('colorby').addEventListener('change', e => {
+  orb.setAttribute('colorby', e.target.value);
+  updateCode();
+});
+
+// mood buttons
+document.querySelectorAll('.moods button').forEach(b => {
+  b.addEventListener('click', () => {
+    document.querySelectorAll('.moods button').forEach(x=>x.classList.remove('active'));
+    b.classList.add('active');
+    orb.setAttribute('mood', b.dataset.mood);
+    // reset manual attrs so mood preset applies
+    ['hue','spin','gain','pulse','wrap','history','colorby','dots'].forEach(a => orb.removeAttribute(a));
+    // update sliders to reflect? leave as-is
+    document.getElementById('moodselect').value = b.dataset.mood;
+    updateCode();
+  });
+});
+document.getElementById('moodselect').addEventListener('change', e => {
+  orb.setAttribute('mood', e.target.value);
+  ['hue','spin','gain','pulse','wrap','history','colorby','dots'].forEach(a => orb.removeAttribute(a));
+  document.querySelectorAll('.moods button').forEach(b => b.classList.toggle('active', b.dataset.mood === e.target.value));
+  updateCode();
+});
+
+// initial
+updateCode();
+</script>
+</body>
+</html>
