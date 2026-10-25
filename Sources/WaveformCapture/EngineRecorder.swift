@@ -3,17 +3,19 @@
   import Foundation
   import WaveformCore
 
-  /// Records what comes out of one audio node (the microphone, in both apps) to a file and, at the
-  /// same time, turns it into what the orb draws.
+  /// Records what comes out of an `AudioSource` to a file and, at the same time, turns it into what the orb draws.
   ///
-  /// The two apps differ only in their `CaptureSettings`: Thames writes 24 kHz AAC and reads the
-  /// spectrum, Ponte writes the 16 kHz WAV its engines read and reads loudness columns. Everything
-  /// else — the conversion, the tap, the route changes, the duration, the errors — is this one
-  /// implementation, tested once in `WaveformCaptureTests`.
+  /// The two apps differ only in their `CaptureSettings`: Thames writes 24 kHz AAC and reads the spectrum, Ponte writes
+  /// the 16 kHz WAV its engines read and reads loudness columns. Everything else — the conversion, the duration, the
+  /// columns, the route changes, the errors — is this one implementation, tested once in `WaveformCaptureTests`.
   ///
-  /// Swift: a "tap" is a closure the audio engine calls on its own audio thread with each small buffer
-  /// of samples. Everything in the closure must be quick, so this one only converts to the target
-  /// format and feeds the builders from reused buffers; a serial queue does the slow part, the writing.
+  /// Where the samples come from is now a seam (`AudioSource`): the system's default input through `AVAudioEngine`, or
+  /// a chosen device through `AVCaptureSession`. The recorder does not care which, and the converter rebuilds itself
+  /// when a buffer arrives in a different format — which is exactly what a route change looks like, however it was
+  /// caused.
+  ///
+  /// Swift: buffers arrive on an audio thread, so the per-buffer work only converts and feeds the builders from
+  /// reused buffers; a serial queue does the slow part, the writing.
   public final class EngineRecorder: @unchecked Sendable {
     /// Why a recording stopped being complete. `stop()` throws it rather than hand back a clip that
     /// ends part way, because a clip cut short sends and answers as if it were the whole.
@@ -34,8 +36,10 @@
     /// Where the recording is being written; set by `start`.
     public private(set) var path = ""
 
-    private let engine: AVAudioEngine
-    private let source: AVAudioNode
+    private let source: AudioSource
+    /// Kept only so a test can make the engine refuse to start, as it does when a device is taken.
+    private(set) var engineSource: EngineSource?
+
     private let lock = NSLock()
     private var file: AVAudioFile?
     private var converter: AVAudioConverter?
@@ -45,31 +49,41 @@
     private var failure: Error?
     private var spareBuffers: [AVAudioPCMBuffer] = []
     private let writer = DispatchQueue(label: "recording-writer")
-    private var configObserver: NSObjectProtocol?
-    /// How the engine is started. A test replaces it to see a restart fail.
-    var startEngine: () throws -> Void
     private let target: AVAudioFormat
 
+    /// Records from the source's own choice of device.
+    public init(settings: CaptureSettings, audioSource: AudioSource) {
+      self.settings = settings
+      self.columns = ColumnRing(capacity: 8192)
+      self.spectrum = settings.spectrumBands.map { SpectrumRing(bands: $0, capacity: 8192) }
+      self.source = audioSource
+      self.engineSource = audioSource as? EngineSource
+      self.target = AVAudioFormat(
+        commonFormat: .pcmFormatFloat32, sampleRate: settings.sampleRate,
+        channels: AVAudioChannelCount(settings.channels), interleaved: false)!
+    }
+
+    /// Records the system's default input through `AVAudioEngine` — the original path, kept so existing call sites
+    /// and tests read the same.
+    ///
     /// - Parameters:
     ///   - settings: what to write and what to draw. See `CaptureSettings.streamingSpeech` and
     ///     `.localTranscription`.
     ///   - engine: the engine to run. A test hands one in offline rendering mode.
     ///   - source: the node to record. Defaults to the engine's microphone input.
-    public init(
+    public convenience init(
       settings: CaptureSettings, engine: AVAudioEngine = AVAudioEngine(), source: AVAudioNode? = nil
     ) {
-      self.settings = settings
-      self.columns = ColumnRing(capacity: 8192)
-      self.spectrum = settings.spectrumBands.map { SpectrumRing(bands: $0, capacity: 8192) }
-      self.engine = engine
-      self.source = source ?? engine.inputNode
-      self.target = AVAudioFormat(
-        commonFormat: .pcmFormatFloat32, sampleRate: settings.sampleRate,
-        channels: AVAudioChannelCount(settings.channels), interleaved: false)!
-      startEngine = { try engine.start() }
+      let engineSource = EngineSource(engine: engine, node: source)
+      self.init(settings: settings, audioSource: engineSource)
+      self.engineSource = engineSource
     }
 
-    deinit { configObserver.map(NotificationCenter.default.removeObserver) }
+    /// How the engine is started. A test replaces it to see a restart fail.
+    var startEngine: () throws -> Void {
+      get { engineSource?.startEngine ?? {} }
+      set { engineSource?.startEngine = newValue }
+    }
 
     /// How much has been recorded so far, in seconds.
     public var seconds: Double { Double(lock.withLock { frames }) / settings.sampleRate }
@@ -81,22 +95,26 @@
       lock.lock()
       file = made
       frames = 0
+      converter = nil
+      columnBuilder = ColumnBuilder(
+        sampleRate: settings.sampleRate, columnsPerSecond: settings.columnsPerSecond,
+        releaseSeconds: settings.releaseSeconds)
+      spectrumBuilder = settings.spectrumBands.map {
+        SpectrumBuilder(
+          sampleRate: settings.sampleRate, columnsPerSecond: settings.columnsPerSecond, bands: $0)
+      }
       lock.unlock()
-      try listen()
-      // The audio route changed (headset in or out, a call ended): the engine stops itself and the
-      // input has a new format, so listen again and carry on writing to the same file.
-      configObserver = NotificationCenter.default.addObserver(
-        forName: .AVAudioEngineConfigurationChange, object: engine, queue: nil
-      ) { [weak self] _ in self?.relisten() }
+
+      try source.start { [weak self] buffer, when in
+        self?.take(buffer, at: when)
+      }
     }
 
     /// Stops and returns how long was recorded, in milliseconds. The file is complete once this returns.
     /// Throws `Incomplete` if the recording was cut short by a failed restart or a failed write.
     public func stop() throws -> Double {
-      configObserver.map(NotificationCenter.default.removeObserver)
-      configObserver = nil
-      source.removeTap(onBus: 0)
-      engine.stop()
+      source.stop()
+      if let sourceError = engineSource?.lastError { fail(sourceError) }
       writer.sync {}  // every queued write has finished once this returns
       lock.lock()
       defer { lock.unlock() }
@@ -109,36 +127,21 @@
       return (Double(frames) / settings.sampleRate * 1_000).rounded()
     }
 
-    /// Listens again after the route changed. If the engine cannot restart, the recording is cut short:
-    /// remember why, so `stop()` can say so.
-    private func relisten() {
-      do { try listen() } catch { fail(error) }
-    }
-
     private func fail(_ error: Error) {
       lock.lock()
       failure = failure ?? error
       lock.unlock()
     }
 
-    /// Installs the tap for the node's current format and starts the engine.
-    private func listen() throws {
-      source.removeTap(onBus: 0)
-      let format = source.outputFormat(forBus: 0)
-      lock.lock()
-      converter = AVAudioConverter(from: format, to: target)
-      columnBuilder = ColumnBuilder(
-        sampleRate: settings.sampleRate, columnsPerSecond: settings.columnsPerSecond,
-        releaseSeconds: settings.releaseSeconds)
-      spectrumBuilder = settings.spectrumBands.map {
-        SpectrumBuilder(
-          sampleRate: settings.sampleRate, columnsPerSecond: settings.columnsPerSecond, bands: $0)
-      }
-      lock.unlock()
-      source.installTap(onBus: 0, bufferSize: 1_024, format: format) { [weak self] buffer, when in
-        self?.take(buffer, at: when)
-      }
-      if !engine.isRunning { try startEngine() }
+    /// The converter for this buffer's format, rebuilt when the format changes.
+    ///
+    /// A route change arrives as buffers in a new format, and so does a capture source whose device differs from the
+    /// default. Rebuilding here means neither has to announce itself.
+    private func converter(for format: AVAudioFormat) -> AVAudioConverter? {
+      if let converter, converter.inputFormat == format { return converter }
+      let made = AVAudioConverter(from: format, to: target)
+      converter = made
+      return made
     }
 
     private func take(_ buffer: AVAudioPCMBuffer, at when: AVAudioTime) {
@@ -146,7 +149,7 @@
         AVAudioFrameCount(
           Double(buffer.frameLength) * settings.sampleRate / buffer.format.sampleRate) + 32
       lock.lock()
-      guard let file, let converter, let columnBuilder else {
+      guard let file, let columnBuilder, let converter = converter(for: buffer.format) else {
         lock.unlock()
         return
       }
@@ -193,6 +196,16 @@
         spareBuffers.append(out)
         lock.unlock()
       }
+    }
+  }
+
+  /// Which source to record from, so an app can say "this device, or whatever the system chose" without knowing what
+  /// that costs.
+  public enum AudioSourceChoice {
+    /// A pinned device records through `AVCaptureSession`; no pin keeps exactly the path the app had before.
+    public static func make(settings: CaptureSettings, deviceUID: String?) -> AudioSource {
+      guard let deviceUID, !deviceUID.isEmpty else { return EngineSource() }
+      return CaptureSource(deviceUID: deviceUID, settings: settings)
     }
   }
 #endif
