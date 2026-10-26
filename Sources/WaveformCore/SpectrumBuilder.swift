@@ -6,9 +6,10 @@ import Foundation
 ///
 /// The bands are evenly spaced on a log scale (so each is the same musical width), from `lowHz` to
 /// `highHz`. Each hop looks at the last `fftSize` samples through a Hann window. A band's value is the
-/// RMS amplitude of the sound inside it: a pure tone of amplitude A shows as A / sqrt(2) in its band,
-/// and the bands' squares add up to the signal's mean square (checked in the tests). Hops land on whole
-/// samples exactly as `ColumnBuilder`'s do, so frame k and column k describe the same moment.
+/// RMS amplitude of the sound inside it: an in-band sine shows approximately as A / sqrt(2), and the
+/// bands' squares sum to the mean square of the in-range test tone. Frequencies outside the configured
+/// range are omitted. Hops land on whole samples exactly as `ColumnBuilder`'s do, so frame k and column k
+/// describe the same moment.
 ///
 /// It never allocates after `init`, so it is safe on the audio thread.
 public final class SpectrumBuilder {
@@ -18,8 +19,8 @@ public final class SpectrumBuilder {
   public let bands: Int
   public let lowHz: Double
   public let highHz: Double
-  /// Display tilt: speech falls by 6 dB or more per octave, so without a lift the high bands would sit
-  /// near silence. Added to each band as `tilt` dB per octave above 1 kHz; 0 is flat and exact.
+  /// Display tilt: speech spectra often fall by roughly 6 dB per octave or more, so without a lift the
+  /// high bands can sit near silence. Added to each band as `tilt` dB per octave above 1 kHz; 0 disables it.
   public let tiltDBPerOctave: Double
 
   private var seen = 0
