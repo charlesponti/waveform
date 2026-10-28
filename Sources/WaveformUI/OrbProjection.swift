@@ -31,7 +31,9 @@ struct OrbProjection {
   static func layer(depth: Float) -> Int { min(3, Int(depth * 4)) }
 
   /// Near dots are drawn a little larger than far ones.
-  static func perspective(depth: Float) -> Float { 0.75 + 0.25 * depth }
+  static func perspective(depth: Float, farScale: Float = 0.75) -> Float {
+    farScale + (1 - farScale) * depth
+  }
 
   /// The radius in points that leaves room for a dot pushed out by `gain`.
   static func radius(in size: CGSize, gain: Float) -> Float {
@@ -69,7 +71,7 @@ struct DotLayers {
 /// and how large it is before perspective (`base`).
 func drawOrbDots(
   _ context: inout GraphicsContext, size: CGSize, model: OrbModel, projection: OrbProjection,
-  gain: Float, tint: Color, opacities: [Double] = OrbProjection.opacities,
+  gain: Float, tint: Color, opacities: [Double] = OrbProjection.opacities, farScale: Float = 0.75,
   value: (Int) -> (out: Float, base: Float)
 ) {
   let radius = OrbProjection.radius(in: size, gain: gain)
@@ -78,7 +80,7 @@ func drawOrbDots(
   for i in 0..<model.count {
     let (out, base) = value(i)
     let p = projection.place(model.unit[i], out: out)
-    let dot = base * OrbProjection.perspective(depth: p.depth)
+    let dot = base * OrbProjection.perspective(depth: p.depth, farScale: farScale)
     layers.add(
       center: CGPoint(x: CGFloat(center.x + p.x * radius), y: CGFloat(center.y - p.y * radius)),
       radius: CGFloat(dot), layer: OrbProjection.layer(depth: p.depth))

@@ -79,7 +79,7 @@ public struct SpectrumOrbView: View {
       tip: style.tip)
     drawOrbDots(
       &context, size: size, model: model, projection: projection, gain: gain, tint: tint,
-      opacities: style.opacities
+      opacities: style.opacities, farScale: style.farScale
     ) { i in
       let level = style.shaped(
         window.value(

@@ -14,12 +14,16 @@ public struct OrbStyle: Equatable, Sendable {
   public var opacities: [Double]
   /// Radians a second the sphere turns by, when it is turning.
   public var spinRate: Float
+  /// How big the farthest dots are next to the nearest ones: 0.75 keeps them close in size, lower makes
+  /// the sphere deeper.
+  public var farScale: Float
   /// How far the sphere leans toward the viewer, in radians.
   public var tip: Float
 
   public init(
     dotBase: Float = 1.0, dotGrowth: Float = 2.8, contrast: Float = 1,
-    opacities: [Double] = [0.18, 0.4, 0.7, 1.0], spinRate: Float = 0.12, tip: Float = 0.32
+    opacities: [Double] = [0.18, 0.4, 0.7, 1.0], spinRate: Float = 0.12, tip: Float = 0.32,
+    farScale: Float = 0.75
   ) {
     self.dotBase = dotBase
     self.dotGrowth = dotGrowth
@@ -27,6 +31,7 @@ public struct OrbStyle: Equatable, Sendable {
     self.opacities = opacities
     self.spinRate = spinRate
     self.tip = tip
+    self.farScale = farScale
   }
 
   /// A loudness from 0 to 1, after `contrast`.
