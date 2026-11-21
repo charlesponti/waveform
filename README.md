@@ -1,12 +1,4 @@
-# waveform (archived)
-
-> **This package has moved.** Waveform now lives in the
-> [hominem-swift monorepo](https://github.com/ponti-studios/hominem-swift)
-> under `packages/waveform`. The `WaveformCore`, `WaveformUI`, and
-> `WaveformCapture` products are available from monorepo release `0.2.1` or
-> later. All active development and the 100% Core/UI coverage gate continue
-> there. This repository is retained for existing tags, release artifacts,
-> and history (also preserved in the monorepo via subtree).
+# waveform
 
 [![CI](https://github.com/charlesponti/waveform/actions/workflows/ci.yml/badge.svg)](https://github.com/charlesponti/waveform/actions/workflows/ci.yml)
 [![Swift versions](https://img.shields.io/endpoint?url=https%3A%2F%2Fswiftpackageindex.com%2Fapi%2Fpackages%2Fcharlesponti%2Fwaveform%2Fbadge%3Ftype%3Dswift-versions)](https://swiftpackageindex.com/charlesponti/waveform)
